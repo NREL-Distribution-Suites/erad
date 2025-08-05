@@ -1,0 +1,752 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Fragility Curves &#8212; ERAD</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-thebe.css?v=4fa983c6" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script async="async" src="../_static/sphinx-thebe.js?v=c100c467"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'simulation/fragility';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Data Models" href="../api/data_models.html" />
+    <link rel="prev" title="Working with GDM models" href="gdm.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search this book..."
+         aria-label="Search this book..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../intro.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/light.png" class="logo__image only-light" alt="ERAD - Home"/>
+    <script>document.write(`<img src="../_static/light.png" class="logo__image only-dark" alt="ERAD - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../intro.html">
+                    Energy Resilience Analysis for Distribution Power System
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Hazards</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../hazards/earthquake.html">Earthquake Modeling</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="../hazards/wildfire.html">Wildfire Modeling</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="../hazards/flood.html">Flood Modeling</a></li>
+
+<li class="toctree-l1"><a class="reference internal" href="../hazards/wind.html">Wind Modeling</a></li>
+
+
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Running Simulations</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="asset.html">Asset Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="systems.html">ERAD Systems</a></li>
+<li class="toctree-l1"><a class="reference internal" href="running.html">Running Simulations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gdm.html">Working with GDM models</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Fragility Curves</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Reference Guides</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../api/data_models.html">Data Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/enumerations.html">Enumerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/quantities.html">Quantities</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Citations</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../reference/citations.html">Citations</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/executablebooks/jupyter-book" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/executablebooks/jupyter-book/issues/new?title=Issue%20on%20page%20%2Fsimulation/fragility.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/simulation/fragility.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Fragility Curves</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-a-custom-fragility-curve">Building a custom fragility curve</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#default-fragility-curves">Default fragility curves</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="fragility-curves">
+<h1>Fragility Curves<a class="headerlink" href="#fragility-curves" title="Link to this heading">#</a></h1>
+<p>ERAD allows users to build custom fragility curves and pass to the simulator. If no user defined model is passed, default profiles defined in <code class="docutils literal notranslate"><span class="pre">erad.fragility_curves</span></code>.</p>
+<section id="building-a-custom-fragility-curve">
+<h2>Building a custom fragility curve<a class="headerlink" href="#building-a-custom-fragility-curve" title="Link to this heading">#</a></h2>
+<p>Each fragility curve in ERAD is mapped to a spicific asset type. Supported asset types can be found in <code class="docutils literal notranslate"><span class="pre">here</span></code>. Each curve additionally maps to a probability function. A probability function requires two key pirces of information.</p>
+<ul class="simple">
+<li><p><strong>distribution</strong>: Probability distribution fuction for the fragility curve</p></li>
+<li><p><strong>parameters</strong>: Parameters associated with the probability distribution fucntion</p>
+<ul>
+<li><p>The first paramater of the distribution has to be a ERAD quantity. These can be imported from <code class="docutils literal notranslate"><span class="pre">erad.quantities</span></code>.</p></li>
+<li><p>Rest of the parameters should be simple floating point values</p></li>
+</ul>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The interface supports all distribution functions supported <a class="reference external" href="https://docs.scipy.org/doc/scipy/reference/stats.html">here</a>.</p>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">erad.models.fragility_curve</span><span class="w"> </span><span class="kn">import</span> <span class="n">FragilityCurve</span><span class="p">,</span> <span class="n">ProbabilityFunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">erad.quantities</span><span class="w"> </span><span class="kn">import</span> <span class="n">Speed</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">erad.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssetTypes</span>
+
+<span class="n">fragility_curve</span> <span class="o">=</span> <span class="n">FragilityCurve</span><span class="p">(</span>
+    <span class="n">asset_type</span><span class="o">=</span><span class="n">AssetTypes</span><span class="o">.</span><span class="n">distribution_poles</span><span class="p">,</span>
+    <span class="n">prob_function</span><span class="o">=</span><span class="n">ProbabilityFunction</span><span class="p">(</span>
+        <span class="n">distribution</span><span class="o">=</span><span class="s2">&quot;norm&quot;</span><span class="p">,</span>
+        <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+            <span class="n">Speed</span><span class="p">(</span><span class="mi">35</span><span class="p">,</span> <span class="s2">&quot;cm/s&quot;</span><span class="p">),</span>
+            <span class="mi">3</span><span class="p">,</span>
+        <span class="p">],</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+<span class="n">fragility_curve</span><span class="o">.</span><span class="n">pprint</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #800080; text-decoration-color: #800080; font-weight: bold">FragilityCurve</span><span style="font-weight: bold">(</span>
+    <span style="color: #808000; text-decoration-color: #808000">name</span>=<span style="color: #008000; text-decoration-color: #008000">''</span>,
+    <span style="color: #808000; text-decoration-color: #808000">asset_type</span>=<span style="font-weight: bold">&lt;</span><span style="color: #ff00ff; text-decoration-color: #ff00ff; font-weight: bold">AssetTypes.distribution_poles:</span><span style="color: #000000; text-decoration-color: #000000"> </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span><span style="color: #000000; text-decoration-color: #000000">&gt;,</span>
+<span style="color: #000000; text-decoration-color: #000000">    </span><span style="color: #808000; text-decoration-color: #808000">prob_function</span><span style="color: #000000; text-decoration-color: #000000">=</span><span style="color: #800080; text-decoration-color: #800080; font-weight: bold">ProbabilityFunction</span><span style="color: #000000; text-decoration-color: #000000; font-weight: bold">(</span>
+<span style="color: #000000; text-decoration-color: #000000">        </span><span style="color: #808000; text-decoration-color: #808000">name</span><span style="color: #000000; text-decoration-color: #000000">=</span><span style="color: #008000; text-decoration-color: #008000">''</span><span style="color: #000000; text-decoration-color: #000000">,</span>
+<span style="color: #000000; text-decoration-color: #000000">        </span><span style="color: #808000; text-decoration-color: #808000">distribution</span><span style="color: #000000; text-decoration-color: #000000">=</span><span style="color: #008000; text-decoration-color: #008000">'norm'</span><span style="color: #000000; text-decoration-color: #000000">,</span>
+<span style="color: #000000; text-decoration-color: #000000">        </span><span style="color: #808000; text-decoration-color: #808000">parameters</span><span style="color: #000000; text-decoration-color: #000000">=</span><span style="color: #000000; text-decoration-color: #000000; font-weight: bold">[</span><span style="color: #000000; text-decoration-color: #000000">&lt;</span><span style="color: #800080; text-decoration-color: #800080; font-weight: bold">Quantity</span><span style="color: #000000; text-decoration-color: #000000; font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">35</span><span style="color: #000000; text-decoration-color: #000000">, </span><span style="color: #008000; text-decoration-color: #008000">'centimeter / second'</span><span style="color: #000000; text-decoration-color: #000000; font-weight: bold">)</span><span style="font-weight: bold">&gt;</span>, <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3.0</span><span style="font-weight: bold">]</span>
+    <span style="font-weight: bold">)</span>
+<span style="font-weight: bold">)</span>
+</pre>
+</div></div>
+</div>
+<p>An instance of the fragility model builds and returns probability distribution functions that are then used to calculate survival probability of assets. The function can be sampled using the <code class="docutils literal notranslate"><span class="pre">sample</span></code> method.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Sampled values returned are ERAD quantities.</p>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">prob_model</span> <span class="o">=</span> <span class="n">fragility_curve</span><span class="o">.</span><span class="n">prob_function</span><span class="o">.</span><span class="n">prob_model</span>
+<span class="n">prob_model</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html">36.5560935306567 centimeter/second</div></div>
+</div>
+<p>Additionally, failure probability at a particular stress level can be calculated using the <code class="docutils literal notranslate"><span class="pre">probability</span></code> method.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">prob_model</span><span class="o">.</span><span class="n">probability</span><span class="p">(</span><span class="n">Speed</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;cm/s&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>np.float64(3.929873434851008e-17)
+</pre></div>
+</div>
+</div>
+</div>
+<p>A complete fragility curve may be plotted sampling over and interval. See example below</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.express</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">px</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="n">wind_speed</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">failure_porb</span> <span class="o">=</span> <span class="p">[</span><span class="n">prob_model</span><span class="o">.</span><span class="n">probability</span><span class="p">(</span><span class="n">Speed</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="s2">&quot;cm/s&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">wind_speed</span><span class="p">]</span>
+
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;peak ground velocity [cm/s]&quot;</span><span class="p">:</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="s2">&quot;failure probability&quot;</span><span class="p">:</span> <span class="n">failure_porb</span><span class="p">})</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">px</span><span class="o">.</span><span class="n">line</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="s2">&quot;peak ground velocity [cm/s]&quot;</span><span class="p">,</span>
+    <span class="n">y</span><span class="o">=</span><span class="s2">&quot;failure probability&quot;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Failure probability of </span><span class="si">{</span><span class="n">fragility_curve</span><span class="o">.</span><span class="n">asset_type</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+</div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">HazardFragilityCurves</span></code> is a container for a set of fragililty curves that react to defined asset property. This set should contain a curve for each asset type define in your asset system. Here we add two curves one for peak ground velocity and a second fragility curve for peak ground acceleration.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">erad.models.fragility_curve</span><span class="w"> </span><span class="kn">import</span> <span class="n">HazardFragilityCurves</span>
+
+<span class="n">curve_set_1</span> <span class="o">=</span> <span class="n">HazardFragilityCurves</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;MY_CURVES&quot;</span><span class="p">,</span>
+    <span class="n">asset_state_param</span><span class="o">=</span><span class="s2">&quot;peak_ground_velocity&quot;</span><span class="p">,</span>
+    <span class="n">curves</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">fragility_curve</span><span class="p">,</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+<span class="n">curve_set_1</span><span class="o">.</span><span class="n">pprint</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #800080; text-decoration-color: #800080; font-weight: bold">HazardFragilityCurves</span><span style="font-weight: bold">(</span>
+    <span style="color: #808000; text-decoration-color: #808000">name</span>=<span style="color: #008000; text-decoration-color: #008000">'MY_CURVES'</span>,
+    <span style="color: #808000; text-decoration-color: #808000">asset_state_param</span>=<span style="color: #008000; text-decoration-color: #008000">'peak_ground_velocity'</span>,
+    <span style="color: #808000; text-decoration-color: #808000">curves</span>=<span style="font-weight: bold">[</span>
+        <span style="color: #800080; text-decoration-color: #800080; font-weight: bold">FragilityCurve</span><span style="font-weight: bold">(</span>
+            <span style="color: #808000; text-decoration-color: #808000">name</span>=<span style="color: #008000; text-decoration-color: #008000">''</span>,
+            <span style="color: #808000; text-decoration-color: #808000">asset_type</span>=<span style="font-weight: bold">&lt;</span><span style="color: #ff00ff; text-decoration-color: #ff00ff; font-weight: bold">AssetTypes.distribution_poles:</span><span style="color: #000000; text-decoration-color: #000000"> </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span><span style="color: #000000; text-decoration-color: #000000">&gt;,</span>
+<span style="color: #000000; text-decoration-color: #000000">            </span><span style="color: #808000; text-decoration-color: #808000">prob_function</span><span style="color: #000000; text-decoration-color: #000000">=</span><span style="color: #800080; text-decoration-color: #800080; font-weight: bold">ProbabilityFunction</span><span style="color: #000000; text-decoration-color: #000000; font-weight: bold">(</span>
+<span style="color: #000000; text-decoration-color: #000000">                </span><span style="color: #808000; text-decoration-color: #808000">name</span><span style="color: #000000; text-decoration-color: #000000">=</span><span style="color: #008000; text-decoration-color: #008000">''</span><span style="color: #000000; text-decoration-color: #000000">,</span>
+<span style="color: #000000; text-decoration-color: #000000">                </span><span style="color: #808000; text-decoration-color: #808000">distribution</span><span style="color: #000000; text-decoration-color: #000000">=</span><span style="color: #008000; text-decoration-color: #008000">'norm'</span><span style="color: #000000; text-decoration-color: #000000">,</span>
+<span style="color: #000000; text-decoration-color: #000000">                </span><span style="color: #808000; text-decoration-color: #808000">parameters</span><span style="color: #000000; text-decoration-color: #000000">=</span><span style="color: #000000; text-decoration-color: #000000; font-weight: bold">[</span><span style="color: #000000; text-decoration-color: #000000">&lt;</span><span style="color: #800080; text-decoration-color: #800080; font-weight: bold">Quantity</span><span style="color: #000000; text-decoration-color: #000000; font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">35</span><span style="color: #000000; text-decoration-color: #000000">, </span><span style="color: #008000; text-decoration-color: #008000">'centimeter / second'</span><span style="color: #000000; text-decoration-color: #000000; font-weight: bold">)</span><span style="font-weight: bold">&gt;</span>, <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3.0</span><span style="font-weight: bold">]</span>
+            <span style="font-weight: bold">)</span>
+        <span style="font-weight: bold">)</span>
+    <span style="font-weight: bold">]</span>
+<span style="font-weight: bold">)</span>
+</pre>
+</div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">curve_set_2</span> <span class="o">=</span> <span class="n">HazardFragilityCurves</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;MY_CURVES&quot;</span><span class="p">,</span>
+    <span class="n">asset_state_param</span><span class="o">=</span><span class="s2">&quot;peak_ground_acceleration&quot;</span><span class="p">,</span>
+    <span class="n">curves</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">FragilityCurve</span><span class="p">(</span>
+            <span class="n">asset_type</span><span class="o">=</span><span class="n">AssetTypes</span><span class="o">.</span><span class="n">distribution_poles</span><span class="p">,</span>
+            <span class="n">prob_function</span><span class="o">=</span><span class="n">ProbabilityFunction</span><span class="p">(</span>
+                <span class="n">distribution</span><span class="o">=</span><span class="s2">&quot;norm&quot;</span><span class="p">,</span>
+                <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+                    <span class="n">Speed</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="s2">&quot;cm/s**2&quot;</span><span class="p">),</span>
+                    <span class="mi">3</span><span class="p">,</span>
+                <span class="p">],</span>
+            <span class="p">),</span>
+        <span class="p">),</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>A completed set of curves can now be added to the <code class="docutils literal notranslate"><span class="pre">HazardSystem</span></code>. This ensure users ability to serialize hazard model along with fragility curvers used to run hazard analysis.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">erad.models.asset</span><span class="w"> </span><span class="kn">import</span> <span class="n">Asset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">erad.runner</span><span class="w"> </span><span class="kn">import</span> <span class="n">HarzardSimulator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">erad.systems.asset_system</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssetSystem</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">erad.systems.hazard_system</span><span class="w"> </span><span class="kn">import</span> <span class="n">HazardSystem</span>
+
+<span class="n">asset</span> <span class="o">=</span> <span class="n">Asset</span><span class="o">.</span><span class="n">example</span><span class="p">()</span>
+<span class="n">asset_system</span> <span class="o">=</span> <span class="n">AssetSystem</span><span class="p">(</span><span class="n">auto_add_composed_components</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">asset_system</span><span class="o">.</span><span class="n">add_component</span><span class="p">(</span><span class="n">asset</span><span class="o">.</span><span class="n">example</span><span class="p">())</span>
+<span class="n">hazard_scenario</span> <span class="o">=</span> <span class="n">HarzardSimulator</span><span class="p">(</span><span class="n">asset_system</span><span class="o">=</span><span class="n">asset_system</span><span class="p">)</span>
+<span class="n">hazard_system</span> <span class="o">=</span> <span class="n">HazardSystem</span><span class="o">.</span><span class="n">earthquake_example</span><span class="p">()</span>
+<span class="n">hazard_system</span><span class="o">.</span><span class="n">add_components</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">curve_set_1</span><span class="p">,</span> <span class="n">curve_set_2</span><span class="p">])</span>
+
+<span class="n">hazard_scenario</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hazard_system</span><span class="o">=</span><span class="n">hazard_system</span><span class="p">,</span> <span class="n">curve_set</span><span class="o">=</span><span class="s2">&quot;MY_CURVES&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="default-fragility-curves">
+<h2>Default fragility curves<a class="headerlink" href="#default-fragility-curves" title="Link to this heading">#</a></h2>
+<p>Default fragility curves can be imported from the ERAD library. Note users can build annd pass user defined fragility curves</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">erad.default_fragility_curves</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEFAULT_FRAGILTY_CURVES</span>
+
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">hazard_curves</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">DEFAULT_FRAGILTY_CURVES</span><span class="p">):</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">hazard_curves</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">.html&quot;</span>
+    <span class="n">hazard_curves</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">80</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+
+    <span class="c1"># assert img.exists(), &quot;Plotting failed, image not created.&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+</div>
+</div>
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            name: "python3",
+            path: "./simulation"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="gdm.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Working with GDM models</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../api/data_models.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Data Models</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-a-custom-fragility-curve">Building a custom fragility curve</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#default-fragility-curves">Default fragility curves</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Aadil Latif
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+<div class="extra_footer">
+  <p>
+© Copyright 2024, Alliance for Sustainable Energy, LLC. This work is licensed under a BSD 3-Clause License
+</p>
+
+</div>
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
