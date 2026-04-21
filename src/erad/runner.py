@@ -63,6 +63,12 @@ class HazardSimulator:
                     hazard_type, filter_func=lambda x: x.timestamp == timestamp
                 ):
                     for asset in self.assets:
+                        # if hazard_type.__name__ == "WindModel":
+                        #     wind_speed = hazard_model.max_wind_speed.to("m/s").magnitude
+                        #     if wind_speed > 45 and asset.asset_type == 8:
+                                # logger.info(f"Wind speed {wind_speed} m/s exceeds 45 m/s at {timestamp}")
+                                # breakpoint()
+
                         assset_state = asset.update_survival_probability(
                             timestamp, hazard_model, probability_models
                         )

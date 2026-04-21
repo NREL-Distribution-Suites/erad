@@ -30,7 +30,8 @@ class ProbabilityFunctionBuilder:
             value (float): value for vetor of interest. Will change with scenarions
         """
         assert isinstance(value, BaseQuantity), "Value must be a BaseQuantity"
-
+        if value.to(self.units).magnitude > 45:
+            import pdb; pdb.set_trace()
         cdf = self.dist.cdf
         try:
             return cdf(value.to(self.units).magnitude, *self.params)

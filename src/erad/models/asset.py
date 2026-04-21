@@ -124,7 +124,7 @@ class AssetState(Component):
             wind_speed = v_max * math.exp(-a * (r - r_v_max))
         else:
             wind_speed = Speed(0, "knots")
-
+        # breakpoint()
         self.wind_speed = SpeedProbability(
             speed=wind_speed.to("miles/hour"),
             survival_probability=1,
@@ -238,7 +238,7 @@ class Asset(Component):
     ):
         asset_state = self._get_asset_state_at_timestamp(time_stamp)
         asset_location = Point(self.longitude, self.latitude)
-
+        # breakpoint()
         if isinstance(hazard_model, hz.EarthQuakeModel):
             asset_state.calculate_earthquake_vectors(asset_location, hazard_model)
         elif isinstance(hazard_model, hz.FireModel):
@@ -251,7 +251,7 @@ class Asset(Component):
             )
         else:
             raise (f"Unsupported hazard type {hazard_model.__class__.__name__}")
-
+        # breakpoint()
         self.calculate_probabilities(asset_state, frag_curves)
         if asset_state not in self.asset_state:
             self.asset_state.append(asset_state)
@@ -275,6 +275,7 @@ class Asset(Component):
                     for model_field in list(prob_model.model_fields.keys())
                     if model_field not in ["uuid", "name", "survival_probability"]
                 ][0]
+                # breakpoint()
                 quantity = getattr(prob_model, quantity_name)
                 prob_model.survival_probability = 1 - prob_inst.probability(quantity)
 

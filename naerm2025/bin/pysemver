@@ -1,0 +1,7 @@
+#!/Users/mmuralid/Documents/NREL-erad/naerm2025/bin/python
+import sys
+from semver.cli import main
+if __name__ == '__main__':
+    if sys.argv[0].endswith('.exe'):
+        sys.argv[0] = sys.argv[0][:-4]
+    sys.exit(main())
