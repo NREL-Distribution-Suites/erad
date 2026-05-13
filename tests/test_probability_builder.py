@@ -16,17 +16,6 @@ CUSTOM_DISTS = [
 ]
 
 
-@pytest.fixture(scope="module")
-def custom_builder():
-    asset = DistributionPole.example()
-    dist_instance = CUSTOM_DISTRIBUTIONS["Darestani2019"](asset)
-    b = ProbabilityFunctionBuilder("Darestani2019", [Speed(1.0, "m/s")], dist_instance)
-    assert isinstance(b.dist, CUSTOM_DISTRIBUTIONS["Darestani2019"])
-    assert b.params == [1.0]
-    assert b.quantity == Speed
-    assert b.units == "meter/second"
-
-
 @pytest.mark.parametrize("dist_name,params,quantity_cls,units", SCIPY_DISTS)
 class TestScipyDistributions:
     def test_init_with_scipy_distribution(self, dist_name, params, quantity_cls, units):
@@ -73,3 +62,8 @@ class TestCustomDistributions:
         b = ProbabilityFunctionBuilder(custom_dist_name, params, dist_instance)
         sample = b.sample()
         assert isinstance(sample, b.quantity) and sample.units == b.units
+
+
+def test_unsupported_distribution_raises():
+    with pytest.raises(ValueError, match="Unsupported distribution"):
+        ProbabilityFunctionBuilder("not_a_real_dist", [Speed(1.0, "m/s")])

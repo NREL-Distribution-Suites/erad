@@ -62,6 +62,7 @@ dev = [
     "mkdocs-material",
     "mkdocstrings[python]",
     "pylint",
+    "pre-commit",
     "pytest",
     "pytest-cov",
     "ruff"
@@ -92,7 +93,6 @@ exclude = [
   "env",
   "venv",
 ]
-ignore-init-module-imports = true
 line-length = 99
 indent-width = 4
 target-version = "py311"

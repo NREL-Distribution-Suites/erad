@@ -34,50 +34,51 @@ asset_to_gdm_mapping = {
     AssetTypes.distribution_underground_cables: [
         ComponentFilterModel(
             component_type=gdc.GeometryBranch,
-            component_filter=lambda x: x.equipment.conductors[0].__class__
-            == gde.ConcentricCableEquipment
-            and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0,
+            component_filter=lambda x: (
+                x.equipment.conductors[0].__class__ == gde.ConcentricCableEquipment
+                and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0
+            ),
         ),
         ComponentFilterModel(
             component_type=gdc.MatrixImpedanceBranch,
-            component_filter=lambda x: x.equipment.c_matrix[0, 0]
-            .to("microfarad/kilometer")
-            .magnitude
-            > 0.05
-            and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0,
+            component_filter=lambda x: (
+                x.equipment.c_matrix[0, 0].to("microfarad/kilometer").magnitude > 0.05
+                and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0
+            ),
         ),
     ],
     AssetTypes.distribution_overhead_lines: [
         ComponentFilterModel(
             component_type=gdc.GeometryBranch,
             component_filter=lambda x: (
-                x.equipment.conductors[0].__class__ == gde.BareConductorEquipment
-            )
-            and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0,
+                (x.equipment.conductors[0].__class__ == gde.BareConductorEquipment)
+                and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0
+            ),
         ),
         ComponentFilterModel(
             component_type=gdc.MatrixImpedanceBranch,
-            component_filter=lambda x: x.equipment.c_matrix[0, 0]
-            .to("microfarad/kilometer")
-            .magnitude
-            < 0.05
-            and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0,
+            component_filter=lambda x: (
+                x.equipment.c_matrix[0, 0].to("microfarad/kilometer").magnitude < 0.05
+                and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0
+            ),
         ),
     ],
     AssetTypes.transmission_underground_cables: [
         ComponentFilterModel(
             component_type=gdc.GeometryBranch,
-            component_filter=lambda x: x.equipment.conductors[0].__class__
-            == gde.ConcentricCableEquipment
-            and x.buses[0].rated_voltage.to("kilovolt").magnitude > 35.0,
+            component_filter=lambda x: (
+                x.equipment.conductors[0].__class__ == gde.ConcentricCableEquipment
+                and x.buses[0].rated_voltage.to("kilovolt").magnitude > 35.0
+            ),
         ),
     ],
     AssetTypes.transmission_overhead_lines: [
         ComponentFilterModel(
             component_type=gdc.GeometryBranch,
-            component_filter=lambda x: x.equipment.conductors[0].__class__
-            == gde.BareConductorEquipment
-            and x.buses[0].rated_voltage.to("kilovolt").magnitude > 35.0,
+            component_filter=lambda x: (
+                x.equipment.conductors[0].__class__ == gde.BareConductorEquipment
+                and x.buses[0].rated_voltage.to("kilovolt").magnitude > 35.0
+            ),
         ),
     ],
 }
