@@ -6,8 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "NREL-erad"
 version="0.1.7"
 description = "Graph based scalable tool for computing energy resilience metrics for distribution systems."
-readme = "README.md"
 requires-python = ">=3.10"
+readme = "README.md"
 authors = [
     { name = "Kapil Duwadi", email = "kapil.duwadi@nrel.gov" },
     { name = "Aadil Latif", email = "aadil.altif@nrel.gov" },
@@ -63,6 +63,7 @@ dev = [
     "mkdocs-material",
     "mkdocstrings[python]",
     "pylint",
+    "pre-commit",
     "pytest",
     "pytest-cov",
     "ruff"
@@ -78,6 +79,8 @@ doc = [
 [project.urls]
 Homepage = "https://github.com/NREL-Distribution-Suites/erad"
 
+[tool.poetry]
+packages = [{ include = "erad", from = "src" }]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
@@ -91,7 +94,6 @@ exclude = [
   "env",
   "venv",
 ]
-ignore-init-module-imports = true
 line-length = 99
 indent-width = 4
 target-version = "py311"

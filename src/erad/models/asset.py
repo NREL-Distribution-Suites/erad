@@ -1,23 +1,26 @@
 from datetime import datetime
 from uuid import UUID
 import math
-
-from pydantic import computed_field, Field
+from pydantic import computed_field, Field, field_validator
 from infrasys.quantities import Distance
 from geopy.distance import geodesic
 from shapely.geometry import Point
 from pyhigh import get_elevation
 from infrasys import Component
 from loguru import logger
+from typing import Literal
+from types import SimpleNamespace
 
-# from erad.constants import RASTER_DOWNLOAD_PATH
+from erad.probability_builder import ProbabilityFunctionBuilder
+from erad.models.custom_distributions import CUSTOM_DISTRIBUTIONS
 from erad.quantities import Acceleration, Speed
 from erad.models.probability import (
     AccelerationProbability,
     DistanceProbability,
     SpeedProbability,
 )
-from erad.enums import AssetTypes
+from erad.enums import AssetTypes, PoleClass, PoleConstructionMaterial
+from erad.quantities import WindAngle, ConductorArea, PoleAge
 import erad.models.hazard as hz
 
 
@@ -250,8 +253,8 @@ class Asset(Component):
                 asset_location, hazard_model, self.elevation + self.height
             )
         else:
-            raise (f"Unsupported hazard type {hazard_model.__class__.__name__}")
-        # breakpoint()
+            raise Exception(f"Unsupported hazard type {hazard_model.__class__.__name__}")
+
         self.calculate_probabilities(asset_state, frag_curves)
         if asset_state not in self.asset_state:
             self.asset_state.append(asset_state)
@@ -266,7 +269,7 @@ class Asset(Component):
         for field in fields:
             prob_model = getattr(asset_state, field)
             if prob_model and prob_model.survival_probability == 1:
-                curve = self.get_vadid_curve(frag_curves, field)
+                curve = self.get_valid_curve(frag_curves, field)
                 if curve is None:
                     raise Exception(f"No fragility curve found for field - {field}")
                 prob_inst = curve.prob_model
@@ -279,13 +282,12 @@ class Asset(Component):
                 quantity = getattr(prob_model, quantity_name)
                 prob_model.survival_probability = 1 - prob_inst.probability(quantity)
 
-    def get_vadid_curve(self, frag_curves, field: SyntaxError) -> float:
+    def get_valid_curve(self, frag_curves, field: str):
         for frag_curve in frag_curves:
             if frag_curve.asset_state_param == field:
                 for curve in frag_curve.curves:
                     if curve.asset_type == self.asset_type:
                         return curve.prob_function
-
         return None
 
     @classmethod
@@ -298,4 +300,59 @@ class Asset(Component):
             latitude=37.7749,
             longitude=-122.4194,
             asset_state=[AssetState.example()],
+        )
+
+
+class DistributionPole(Asset):
+    pole_class: PoleClass | None = Field(
+        description="Class of the pole (only for distribution poles)"
+    )
+    pole_material: PoleConstructionMaterial | None = Field(
+        description="Construction material of the pole (only for distribution poles)"
+    )
+    wind_angle: WindAngle | None = Field(
+        description="Angle between wind direction and pole"
+    )  # Hazard property?
+    conductor_area: ConductorArea | None = Field(description="Conductor area in m^2")
+    pole_age: PoleAge | None = Field(description="Age of the pole in years")
+    probability_dist: Literal[*CUSTOM_DISTRIBUTIONS] | None = Field(
+        description="Custom distribution function to model pole failure probability. Run list_custom_distributions() for available options."
+    )
+
+    @field_validator("asset_type")
+    @classmethod
+    def validate_asset_type(cls, v):
+        if v != AssetTypes.distribution_poles:
+            raise ValueError("Invalid asset type for DistributionPole, must be distribution_poles")
+        return v
+
+    def get_valid_curve(self, frag_curves, field: str):
+        if self.probability_dist and field == "wind_speed":
+            custom_dist_instance = CUSTOM_DISTRIBUTIONS[self.probability_dist](self)
+            prob_builder = ProbabilityFunctionBuilder(
+                dist=self.probability_dist,
+                params=[Speed(0, "m/s")],  # Only to set output type
+                custom_dist_instance=custom_dist_instance,
+            )
+            wrapper = SimpleNamespace()
+            wrapper.prob_model = prob_builder
+            return wrapper
+        return super().get_valid_curve(frag_curves, field)
+
+    @classmethod
+    def example(cls) -> "DistributionPole":
+        return DistributionPole(
+            name="Asset 1",
+            asset_type=AssetTypes.distribution_poles,
+            distribution_asset=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            height=Distance(100, "m"),
+            latitude=37.7749,
+            longitude=-122.4194,
+            asset_state=[AssetState.example()],
+            pole_class=PoleClass.CLASS_5,
+            pole_material=PoleConstructionMaterial.WOOD,
+            wind_angle=WindAngle(90, "degree"),
+            conductor_area=ConductorArea(0.0005, "m**2"),
+            pole_age=PoleAge(30, "year"),
+            probability_dist="Darestani2019",
         )

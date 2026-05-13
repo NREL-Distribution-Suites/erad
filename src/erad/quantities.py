@@ -29,3 +29,21 @@ class Flow(BaseQuantity):
     """Quantity representing flow."""
 
     __base_unit__ = "feet**3/second"
+
+
+class WindAngle(BaseQuantity):
+    """Quantity representing angle between wind and conductor."""
+
+    __base_unit__ = "degree"
+
+
+class ConductorArea(BaseQuantity):
+    """Quantity representing cross-sectional area of a conductor."""
+
+    __base_unit__ = "m**2"
+
+
+class PoleAge(BaseQuantity):
+    """Quantity representing age of a pole."""
+
+    __base_unit__ = "year"

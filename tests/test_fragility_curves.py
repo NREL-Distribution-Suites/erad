@@ -31,7 +31,7 @@ def test_invalid_hazard_fragility_model():
                 FragilityCurve(
                     asset_type=AssetTypes.battery_storage,
                     prob_function=ProbabilityFunction(
-                        distribution="lognorm", parameters=[Speed(35, "cm/s"), 0.5]
+                        distribution="not_valid_dist", parameters=[Speed(35, "cm/s"), 0.5]
                     ),
                 ),
             ],

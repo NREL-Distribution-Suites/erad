@@ -1,6 +1,6 @@
 from infrasys import Component
 
-from gdm.distribution import DistributionSystem
+from gdm.distribution.distribution_system import DistributionSystem
 import pytest
 
 from erad.systems.asset_system import AssetSystem

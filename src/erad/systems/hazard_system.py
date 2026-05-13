@@ -14,9 +14,9 @@ class HazardSystem(System):
         super().__init__(*args, **kwargs)
 
     def add_component(self, component, **kwargs):
-        assert isinstance(
-            component, HAZARD_MODELS
-        ), f"Unsupported model type {component.__class__.__name__}"
+        assert isinstance(component, HAZARD_MODELS), (
+            f"Unsupported model type {component.__class__.__name__}"
+        )
         return super().add_component(component, **kwargs)
 
     def add_components(self, *components, **kwargs):

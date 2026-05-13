@@ -2,7 +2,6 @@ from functools import cached_property
 from typing import Literal
 from pathlib import Path
 
-
 from infrasys import Component, BaseQuantity
 from scipy.stats import _continuous_distns
 from pydantic import field_validator
@@ -13,6 +12,7 @@ from erad.probability_builder import ProbabilityFunctionBuilder
 from erad.models.asset import AssetState
 from erad.enums import AssetTypes
 from erad.quantities import Speed
+from erad.models.custom_distributions import CUSTOM_DISTRIBUTIONS
 
 
 FRAGILITY_CURVE_TYPES = [
@@ -23,17 +23,26 @@ SUPPORTED_CONT_DIST = [name for name in dir(_continuous_distns) if not name.star
 
 class ProbabilityFunction(Component):
     name: str = ""
-    distribution: Literal[*SUPPORTED_CONT_DIST]
+    distribution: str
     parameters: list[float | BaseQuantity]
 
+    @field_validator("distribution")
+    def validate_distribution(cls, value):
+        if isinstance(value, str):
+            if value not in SUPPORTED_CONT_DIST and value not in CUSTOM_DISTRIBUTIONS:
+                raise ValueError(f"Unsupported distribution: {value}")
+        return value
+
     @field_validator("parameters")
-    def validate_parameters(cls, value):
+    def validate_parameters(cls, value, info):
         if not any(isinstance(v, BaseQuantity) for v in value):
             raise ValueError("There should be atleast one BaseQuantity in the parameters")
 
-        units = set([v.units for v in value if isinstance(v, BaseQuantity)])
-        if not len(units) == 1:
-            raise ValueError("All BaseQuantities should have the same units")
+        distribution = info.data.get("distribution")
+        if distribution in SUPPORTED_CONT_DIST:
+            units = set([v.units for v in value if isinstance(v, BaseQuantity)])
+            if len(units) > 1:
+                raise ValueError("All BaseQuantities should have the same units")
         return value
 
     @cached_property
@@ -42,6 +51,7 @@ class ProbabilityFunction(Component):
 
     @classmethod
     def example(cls) -> "ProbabilityFunction":
+        """Example for a scipy distribution."""
         return ProbabilityFunction(
             distribution="norm",
             parameters=[Speed(1.5, "m/s"), 2],
@@ -55,6 +65,7 @@ class FragilityCurve(Component):
 
     @classmethod
     def example(cls) -> "FragilityCurve":
+        """Example for a fragility curve with a scipy distribution."""
         return FragilityCurve(
             asset_type=AssetTypes.substation,
             prob_function=ProbabilityFunction.example(),
