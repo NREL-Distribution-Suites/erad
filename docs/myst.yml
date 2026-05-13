@@ -1,0 +1,12 @@
+version: 1
+project:
+  id: 18f87784-7fc8-44fa-946e-ecf2ce689587
+  title: ERAD
+  authors:
+    - name: Aadil Latif
+  bibliography:
+    - references.bib
+site:
+  template: book-theme
+  options:
+    logo: _static/light.png

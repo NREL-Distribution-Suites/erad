@@ -1,89 +1,36 @@
 # Data Models
 
+This page lists the primary ERAD model classes.
+
 ## Hazard Models
 
-### Earthquake Models
-```{eval-rst}
-.. autopydantic_model:: erad.models.hazard.earthquake.EarthQuakeModel
-    :exclude-members: example, validate_fields
-```
+- `erad.models.hazard.earthquake.EarthQuakeModel`
+- `erad.models.hazard.wind.WindModel`
+- `erad.models.hazard.flood.FloodModelArea`
+- `erad.models.hazard.flood.FloodModel`
+- `erad.models.hazard.wild_fire.FireModel`
+- `erad.models.hazard.wild_fire.FireModelArea`
 
-### Wind Models
+## Asset Models
 
-```{eval-rst}
-.. autopydantic_model:: erad.models.hazard.wind.WindModel
-```
+- `erad.models.asset.AssetState`
+- `erad.models.asset.Asset`
 
-### Flood Models
+## Asset Mapping Models
 
-```{eval-rst}
-.. autopydantic_model:: erad.models.hazard.flood.FloodModelArea
-```
+- `erad.models.asset_mapping.ComponentFilterModel`
+- `erad.models.asset_mapping.AssetComponentMap`
 
-```{eval-rst}
-.. autopydantic_model:: erad.models.hazard.flood.FloodModel
-```
+## Fragility Models
 
-### Fire Models
+- `erad.models.fragility_curve.ProbabilityFunction`
+- `erad.models.fragility_curve.FragilityCurve`
+- `erad.models.fragility_curve.HazardFragilityCurves`
 
-```{eval-rst}
-.. autopydantic_model:: erad.models.hazard.wild_fire.FireModel
-```
+## Probability Models
 
-```{eval-rst}
-.. autopydantic_model:: erad.models.hazard.wild_fire.FireModelArea
-```
-
-## Asset Model
-
-```{eval-rst}
-.. autopydantic_model:: erad.models.asset.AssetState
-
-.. autopydantic_model:: erad.models.asset.Asset
-```
-
-## Asset Mapping Model
-
-```{eval-rst}
-
-.. autopydantic_model:: erad.models.asset_mapping.ComponentFilterModel
-
-.. autopydantic_model:: erad.models.asset_mapping.AssetComponentMap
-```
-
-
-## Fragility Model
-
-```{eval-rst}
-.. autopydantic_model:: erad.models.fragility_curve.ProbabilityFunction
-
-.. autopydantic_model:: erad.models.fragility_curve.FragilityCurve
-
-.. autopydantic_model:: erad.models.fragility_curve.HazardFragilityCurves
-
-```
-
-## Probabaility Model
-
-```{eval-rst}
-.. autopydantic_model:: erad.models.probability.BaseProbabilityModel
-```
-### Speed Model
-```{eval-rst}
-.. autopydantic_model:: erad.models.probability.SpeedProbability
-```
-
-### Temperature Model
-```{eval-rst}
-.. autopydantic_model:: erad.models.probability.TemperatureProbability
-```
-
-### Distance Model
-```{eval-rst}
-.. autopydantic_model:: erad.models.probability.DistanceProbability
-```
-
-### Acceleration Model
-```{eval-rst}
-.. autopydantic_model:: erad.models.probability.AccelerationProbability
-```
+- `erad.models.probability.BaseProbabilityModel`
+- `erad.models.probability.SpeedProbability`
+- `erad.models.probability.TemperatureProbability`
+- `erad.models.probability.DistanceProbability`
+- `erad.models.probability.AccelerationProbability`

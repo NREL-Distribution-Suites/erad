@@ -10,26 +10,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-
+        uses: actions/checkout@v6
+        
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+          
+      - name: Install Jupyter Book
+        run: |
+          pip install --upgrade pip
+          pip install jupyter-book==2.1.2
+          
       - name: Install system dependencies (Graphviz)
-        run:  |
+        run: |
           sudo apt-get update
           sudo apt-get install -y graphviz graphviz-dev
+          
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install graphviz pygraphviz 
-          python -m pip install ".[doc,dev]"
-          pip install jupyter-book ghp-import matplotlib gdmloader
-
-      - name: Build the book
-        run: jupyter-book build docs
-
+          python -m pip install graphviz pygraphviz
+          python -m pip install ".[doc,dev,mcp]"
+          pip install ghp-import matplotlib gdmloader
+          
+      - name: Clean old builds
+        run: rm -rf docs/_build
+        
+      - name: Build Jupyter Book
+        working-directory: docs
+        env:
+          BASE_URL: /${{ github.event.repository.name }}
+        run: jupyter-book build --html --force
+        
       - name: Deploy to GitHub Pages
-        run: |
-          ghp-import -n -p -f docs/_build/html
+        run: ghp-import -n -p -f docs/_build/html

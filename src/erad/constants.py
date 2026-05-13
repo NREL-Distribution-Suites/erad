@@ -49,6 +49,8 @@ ASSET_TYPES = (
     prob.TemperatureProbability,
     prob.DistanceProbability,
     prob.SpeedProbability,
+    prob.FlowProbability,
+    prob.RatioProbability,
 )
 
 HAZARD_TYPES = (
@@ -81,6 +83,8 @@ SUPPORTED_MODELS = [
     prob.TemperatureProbability,
     prob.DistanceProbability,
     prob.SpeedProbability,
+    prob.FlowProbability,
+    prob.RatioProbability,
     frag.ProbabilityFunction,
     frag.FragilityCurve,
     frag.HazardFragilityCurves,

@@ -9,7 +9,7 @@ We welcome contributions from the community! Please follow these steps to get st
 To install ERAD in development mode, clone the repository and install the dependencies using pip in a new environment:
 
 ```shell
-git clone https://github.com/NREL-Distribution-Suites/erad.git
+git clone https://github.com/NLR-Distribution-Suite/erad.git
 cd erad
 pip install -e[dev,doc] .
 ```

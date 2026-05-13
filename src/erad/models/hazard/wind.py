@@ -49,33 +49,58 @@ class WindModel(BaseDisasterModel):
     def from_hurricane_sid(cls, hurricane_sid: str) -> list["WindModel"]:
         assert os.path.exists(ERAD_DB), f"The data file {ERAD_DB} not found"
         conn = sqlite3.connect(ERAD_DB)
-        hurricane_data = pd.read_sql(
-            f"SELECT * FROM {HISTROIC_HURRICANE_TABLE} WHERE `SID ` = '{hurricane_sid}';", conn
-        )
-        cols = [
-            "LAT (degrees_north)",
-            "LON (degrees_east)",
-            "USA_WIND (kts)",
-            "USA_ROCI (nmile)",
-            "USA_RMW (nmile)",
-            "USA_POCI (mb)",
-            "ISO_TIME ",
-        ]
-        hurricane_data = hurricane_data[cols]
-        for col in cols:
-            hurricane_data = hurricane_data[hurricane_data[col] != " "]
-        if hurricane_data.empty:
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info('{HISTROIC_HURRICANE_TABLE}')")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        def pick_column(*candidates: str) -> str | None:
+            for candidate in candidates:
+                if candidate in columns:
+                    return candidate
+            return None
+
+        sid_col = pick_column("SID", "SID ")
+        lat_col = pick_column("LAT (degrees_north)")
+        lon_col = pick_column("LON (degrees_east)")
+        wind_col = pick_column("USA_WIND (kts)")
+        roci_col = pick_column("USA_ROCI (nmile)")
+        rmw_col = pick_column("USA_RMW (nmile)")
+        poci_col = pick_column("USA_POCI (mb)")
+        iso_time_col = pick_column("ISO_TIME", "ISO_TIME ")
+
+        if not all(
+            [sid_col, lat_col, lon_col, wind_col, roci_col, rmw_col, poci_col, iso_time_col]
+        ):
+            conn.close()
             raise ValueError(
-                f"Hurricane '{hurricane_sid}'  not found in column 'SID', table '{HISTROIC_HURRICANE_TABLE}' in the database"
+                "historic_hurricanes schema is missing required columns. "
+                f"Found columns: {sorted(columns)}"
             )
+
+        query = (
+            f'SELECT "{lat_col}" AS lat, "{lon_col}" AS lon, '
+            f'"{wind_col}" AS wind, "{roci_col}" AS roci, '
+            f'"{rmw_col}" AS rmw, "{poci_col}" AS poci, '
+            f'"{iso_time_col}" AS iso_time '
+            f'FROM {HISTROIC_HURRICANE_TABLE} WHERE "{sid_col}" = ?'
+        )
+        hurricane_data = pd.read_sql_query(query, conn, params=(hurricane_sid,))
+
+        for col in ["lat", "lon", "wind", "roci", "rmw", "poci", "iso_time"]:
+            hurricane_data = hurricane_data[hurricane_data[col] != " "]
+
+        if hurricane_data.empty:
+            conn.close()
+            raise ValueError(
+                f"Hurricane '{hurricane_sid}' not found in column '{sid_col}', "
+                f"table '{HISTROIC_HURRICANE_TABLE}' in the database"
+            )
+
         conn.close()
         geometry = [
-            Point(lon, lat)
-            for lat, lon in zip(
-                hurricane_data["LAT (degrees_north)"], hurricane_data["LON (degrees_east)"]
-            )
+            Point(lon, lat) for lat, lon in zip(hurricane_data["lat"], hurricane_data["lon"])
         ]
-        hurricane_data["ISO_TIME "] = pd.to_datetime(hurricane_data["ISO_TIME "])
+        hurricane_data["iso_time"] = pd.to_datetime(hurricane_data["iso_time"])
         hurricane_data = gpd.GeoDataFrame(hurricane_data, geometry=geometry)
         hurricane_data.set_crs("epsg:4326")
         track = []
@@ -83,14 +108,12 @@ class WindModel(BaseDisasterModel):
             track.append(
                 WindModel(
                     name=hurricane_sid,
-                    timestamp=row["ISO_TIME "],
+                    timestamp=row["iso_time"],
                     center=row["geometry"],
-                    max_wind_speed=Speed(float(row["USA_WIND (kts)"]), "knots"),
-                    radius_of_max_wind=Distance(float(row["USA_RMW (nmile)"]), "nautical_mile"),
-                    radius_of_closest_isobar=Distance(
-                        float(row["USA_ROCI (nmile)"]), "nautical_mile"
-                    ),
-                    air_pressure=Pressure(float(row["USA_POCI (mb)"]), "millibar"),
+                    max_wind_speed=Speed(float(row["wind"]), "knots"),
+                    radius_of_max_wind=Distance(float(row["rmw"]), "nautical_mile"),
+                    radius_of_closest_isobar=Distance(float(row["roci"]), "nautical_mile"),
+                    air_pressure=Pressure(float(row["poci"]), "millibar"),
                 )
             )
 

@@ -47,3 +47,7 @@ class PoleAge(BaseQuantity):
     """Quantity representing age of a pole."""
 
     __base_unit__ = "year"
+class Ratio(BaseQuantity):
+    """Quantity representing a dimensionless ratio (e.g. soil saturation fraction)."""
+
+    __base_unit__ = "percent"

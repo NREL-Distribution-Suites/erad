@@ -28,9 +28,9 @@ def test_system_serialization_deserialization(tmp_path):
     h = HazardSystem(auto_add_composed_components=True)
     for m in HAZARD_MODELS:
         h.add_component(m.example())
-    h.to_json(tmp_path / "test_system.json")
+    h.to_json(tmp_path / "test_hazard_model.json")
 
-    HazardSystem.from_json(tmp_path / "test_system.json")
+    HazardSystem.from_json(tmp_path / "test_hazard_model.json")
 
 
 def test_earthquake_example():

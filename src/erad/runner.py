@@ -57,6 +57,7 @@ class HazardSimulator:
         self.hazard_system = hazard_system
         self.timestamps = self._get_time_stamps()
         for timestamp in self.timestamps:
+            logger.info(f"Simulating hazard at {timestamp}")
             for hazard_type in HAZARD_TYPES:
                 for hazard_model in self.hazard_system.get_components(
                     hazard_type, filter_func=lambda x: x.timestamp == timestamp
@@ -120,6 +121,7 @@ class HazardScenarioGenerator:
         np.random.seed(seed)
         tracked_changes = []
         for i in range(number_of_samples):
+            logger.info(f"Generating sample {i+1}/{number_of_samples}")
             scenario_name = f"sample_{i}"
             tracked_changes.extend(self._sample(scenario_name))
         return tracked_changes

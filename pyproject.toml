@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "NREL-erad"
-version="0.1.5"
+dynamic = ["version"]
 description = "Graph based scalable tool for computing energy resilience metrics for distribution systems."
 requires-python = ">=3.10"
 readme = "README.md"
 authors = [
-    { name = "Kapil Duwadi", email = "kapil.duwadi@nrel.gov" },
     { name = "Aadil Latif", email = "aadil.altif@nrel.gov" },
+    { name = "Kapil Duwadi", email = "kapil.duwadi@nrel.gov" },
     { name = "Kwami Sedzro", email = "sherinann.abraham@nrel.gov" },
     { name = "Sherin Ann Abraham", email = "kwami.sedzro@nrel.gov" },
     { name = "Bryan Palmintier", email = "bryan.palmintier@nrel.gov" },
@@ -40,7 +40,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-    "grid-data-models~=2.1.4",
+    "grid-data-models==2.3.0",
     "gdmloader",
     "geopandas",
     "requests",
@@ -50,6 +50,11 @@ dependencies = [
     "pyhigh",
     "geopy",
     "scipy",
+    "sqlmodel",
+    "loguru>=0.7.0",
+    "mcp>=1.0.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0"
 ]
 
 
@@ -64,6 +69,7 @@ dev = [
     "pylint",
     "pre-commit",
     "pytest",
+    "pytest-asyncio",
     "pytest-cov",
     "ruff"
 ]
@@ -73,13 +79,17 @@ doc = [
   "myst-parser",
   "autodoc_pydantic",
   "sphinxcontrib-mermaid",
+  "jupyter-book==2.1.2",
 ]
 
 [project.urls]
-Homepage = "https://github.com/NREL-Distribution-Suites/erad"
+Homepage = "https://github.com/NLR-Distribution-Suite/erad"
 
 [tool.poetry]
 packages = [{ include = "erad", from = "src" }]
+[project.scripts]
+erad = "erad.cli:main"
+erad-mcp = "erad.mcp:main"
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
@@ -124,4 +134,14 @@ docstring-code-line-length = "dynamic"
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "F401"]
 "**/{tests,docs,tools}/*" = ["E402"]
+
+[tool.setuptools.dynamic]
+version = {attr = "erad.__version__"}
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 

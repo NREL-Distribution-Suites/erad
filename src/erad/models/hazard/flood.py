@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from infrasys import Component
 
 from erad.models.hazard.base_models import BaseDisasterModel
-from erad.quantities import Speed
+from erad.quantities import Speed, Flow, Ratio
 
 
 class FloodModelArea(Component):
@@ -15,6 +15,10 @@ class FloodModelArea(Component):
     affected_area: Polygon
     water_velocity: Speed
     water_elevation: Distance
+    soil_saturation: Ratio | None = None
+    snow_water_equivalent: Distance | None = None
+    runoff_volume: Flow | None = None
+    groundwater_flow: Flow | None = None
 
     @field_validator("affected_area", mode="before")
     def deserialize_polygon(cls, value):
@@ -76,6 +80,10 @@ class FloodModel(BaseDisasterModel):
                     hovertemplate=f"""
                         <br> <b>Water velocity:</b> {area.water_velocity}
                         <br> <b>Water elevation:</b> {area.water_elevation}
+                        {"<br> <b>Soil saturation:</b> " + str(area.soil_saturation) if area.soil_saturation is not None else ""}
+                        {"<br> <b>SWE:</b> " + str(area.snow_water_equivalent) if area.snow_water_equivalent is not None else ""}
+                        {"<br> <b>Runoff:</b> " + str(area.runoff_volume) if area.runoff_volume is not None else ""}
+                        {"<br> <b>Groundwater flow:</b> " + str(area.groundwater_flow) if area.groundwater_flow is not None else ""}
                         """,
                     visible=(time_index == 0),
                 )

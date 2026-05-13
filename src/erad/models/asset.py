@@ -17,6 +17,8 @@ from erad.quantities import Acceleration, Speed
 from erad.models.probability import (
     AccelerationProbability,
     DistanceProbability,
+    FlowProbability,
+    RatioProbability,
     SpeedProbability,
 )
 from erad.enums import AssetTypes, PoleClass, PoleConstructionMaterial
@@ -33,6 +35,10 @@ class AssetState(Component):
     fire_boundary_dist: DistanceProbability | None = None
     peak_ground_velocity: SpeedProbability | None = None
     peak_ground_acceleration: AccelerationProbability | None = None
+    soil_saturation: RatioProbability | None = None
+    snow_water_equivalent: DistanceProbability | None = None
+    runoff_volume: FlowProbability | None = None
+    groundwater_flow: FlowProbability | None = None
 
     def calculate_earthquake_vectors(
         self, asset_coordinate: Point, hazard_model: hz.EarthQuakeModel
@@ -146,6 +152,26 @@ class AssetState(Component):
                     speed=area.water_velocity,
                     survival_probability=1,
                 )
+                if area.soil_saturation is not None:
+                    self.soil_saturation = RatioProbability(
+                        ratio=area.soil_saturation,
+                        survival_probability=1,
+                    )
+                if area.snow_water_equivalent is not None:
+                    self.snow_water_equivalent = DistanceProbability(
+                        distance=area.snow_water_equivalent,
+                        survival_probability=1,
+                    )
+                if area.runoff_volume is not None:
+                    self.runoff_volume = FlowProbability(
+                        flow=area.runoff_volume,
+                        survival_probability=1,
+                    )
+                if area.groundwater_flow is not None:
+                    self.groundwater_flow = FlowProbability(
+                        flow=area.groundwater_flow,
+                        survival_probability=1,
+                    )
 
         if self.flood_depth is None and self.flood_velocity is None:
             self.flood_depth = DistanceProbability(
@@ -178,6 +204,16 @@ class AssetState(Component):
             if self.peak_ground_acceleration
             else 1
         )
+        soil_saturation_survival = (
+            self.soil_saturation.survival_probability if self.soil_saturation else 1
+        )
+        swe_survival = (
+            self.snow_water_equivalent.survival_probability if self.snow_water_equivalent else 1
+        )
+        runoff_survival = self.runoff_volume.survival_probability if self.runoff_volume else 1
+        gw_flow_survival = (
+            self.groundwater_flow.survival_probability if self.groundwater_flow else 1
+        )
 
         return (
             wind_survival_probability
@@ -186,6 +222,10 @@ class AssetState(Component):
             * fire_survival_probability
             * pgv_survival_probability
             * pga_survival_probability
+            * soil_saturation_survival
+            * swe_survival
+            * runoff_survival
+            * gw_flow_survival
         )
 
     @classmethod
@@ -271,7 +311,9 @@ class Asset(Component):
             if prob_model and prob_model.survival_probability == 1:
                 curve = self.get_valid_curve(frag_curves, field)
                 if curve is None:
-                    raise Exception(f"No fragility curve found for field - {field}")
+                    raise Exception(
+                        f"No fragility curve found for field - {field} for asset type {self.asset_type.name}"
+                    )
                 prob_inst = curve.prob_model
                 quantity_name = [
                     model_field

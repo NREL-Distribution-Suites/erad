@@ -25,6 +25,10 @@ parts:
     - file: api/data_models
     - file: api/enumerations
     - file: api/quantities
+  - caption: Interface Guides
+    chapters:
+    - file: api/cli
+    - file: api/mcp_server
   - caption: Community Contributions
     chapters:
     - file: community/contribute

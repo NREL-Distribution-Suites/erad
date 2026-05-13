@@ -5,7 +5,7 @@ from infrasys import Component
 from pydantic import Field
 from abc import ABC
 
-from erad.quantities import Speed, Acceleration, Temperature
+from erad.quantities import Speed, Acceleration, Temperature, Flow, Ratio
 
 
 class BaseProbabilityModel(Component, ABC):
@@ -72,5 +72,39 @@ class AccelerationProbability(BaseProbabilityModel):
     def example(cls) -> "AccelerationProbability":
         return AccelerationProbability(
             acceleration=Acceleration(0, "m/s**2"),
+            survival_probability=1.0,
+        )
+
+
+class FlowProbability(BaseProbabilityModel):
+    flow: Annotated[
+        Flow,
+        Field(
+            ...,
+            description="Flow rate experienced by the asset e.g. streamflow, runoff discharge",
+        ),
+    ]
+
+    @classmethod
+    def example(cls) -> "FlowProbability":
+        return FlowProbability(
+            flow=Flow(0, "feet**3/second"),
+            survival_probability=1.0,
+        )
+
+
+class RatioProbability(BaseProbabilityModel):
+    ratio: Annotated[
+        Ratio,
+        Field(
+            ...,
+            description="Dimensionless ratio e.g. soil saturation fraction",
+        ),
+    ]
+
+    @classmethod
+    def example(cls) -> "RatioProbability":
+        return RatioProbability(
+            ratio=Ratio(0, "percent"),
             survival_probability=1.0,
         )

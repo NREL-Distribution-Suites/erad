@@ -1,8 +1,5 @@
 # Quantities
 
+Quantity definitions are provided by `erad.quantities`.
 
-```{eval-rst}
-.. automodule:: erad.quantities
-    :members: 
-
-```
+Use these objects when building or interpreting hazard and fragility inputs in ERAD workflows.

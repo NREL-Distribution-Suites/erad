@@ -2,6 +2,7 @@ from collections import defaultdict, Counter
 from pathlib import Path
 
 from gdm.distribution.enums import PlotingStyle, MapType
+from sqlmodel import SQLModel, Session, create_engine
 from gdm.distribution import DistributionSystem
 from shapely.geometry import Point, LineString
 import gdm.distribution.components as gdc
@@ -20,6 +21,7 @@ from erad.constants import ASSET_TYPES, DEFAULT_TIME_STAMP, RASTER_DOWNLOAD_PATH
 from erad.gdm_mapping import asset_to_gdm_mapping
 from erad.models.asset import Asset, AssetState
 from erad.enums import AssetTypes, NodeTypes
+from erad.tables import AssetStateTable
 
 
 class AssetSystem(System):
@@ -161,13 +163,16 @@ class AssetSystem(System):
             crs="EPSG:4326",
         )
         edge_df = pd.DataFrame(edge_data)
-        edge_df = edge_df[edge_df["longitude"].apply(lambda x: len(x) == 2)]
-        geometry = [
-            LineString([Point(xy) for xy in zip(*xys)])
-            for xys in zip(edge_df["longitude"], edge_df["latitude"])
-        ]
-        gdf_edges = gpd.GeoDataFrame(edge_df, geometry=geometry, crs="EPSG:4326")
-        complete_gdf = pd.concat([gdf_nodes, gdf_edges])
+        if not edge_df.empty:
+            edge_df = edge_df[edge_df["longitude"].apply(lambda x: len(x) == 2)]
+            geometry = [
+                LineString([Point(xy) for xy in zip(*xys)])
+                for xys in zip(edge_df["longitude"], edge_df["latitude"])
+            ]
+            gdf_edges = gpd.GeoDataFrame(edge_df, geometry=geometry, crs="EPSG:4326")
+            complete_gdf = pd.concat([gdf_nodes, gdf_edges])
+        else:
+            complete_gdf = gdf_nodes
         return complete_gdf
 
     def to_geojson(self) -> str:
@@ -471,3 +476,53 @@ class AssetSystem(System):
             figure.show()
 
         return figure
+
+    def export_results(self, db_path: str):
+        """Export the AssetSystem results to a SQLite database using SQLModel."""
+
+        engine = create_engine(f"sqlite:///{db_path}")
+        SQLModel.metadata.create_all(engine)
+
+        with Session(engine) as session:
+            for asset in self.get_components(Asset):
+                for state in asset.asset_state:
+                    record = AssetStateTable(
+                        asset_name=asset.name,
+                        asset_type=asset.asset_type.name,
+                        distribution_asset=str(asset.distribution_asset),
+                        timestamp=state.timestamp.isoformat(),
+                        survival_probability=state.survival_probability,
+                        wind_speed__miles_per_hour=state.wind_speed.speed.to(
+                            "miles/hour"
+                        ).magnitude
+                        if state.wind_speed
+                        else None,
+                        fire_boundary_dist__feet=state.fire_boundary_dist.distance.to(
+                            "feet"
+                        ).magnitude
+                        if state.fire_boundary_dist
+                        else None,
+                        flood_depth__feet=state.flood_depth.distance.to("feet").magnitude
+                        if state.flood_depth
+                        else None,
+                        flood_velocity__feet_per_second=state.flood_velocity.speed.to(
+                            "feet/second"
+                        ).magnitude
+                        if state.flood_velocity
+                        else None,
+                        peak_ground_acceleration__feet_per_second2=state.peak_ground_acceleration.acceleration.to(
+                            "feet/second**2"
+                        ).magnitude
+                        if state.peak_ground_acceleration
+                        else None,
+                        peak_ground_velocity__inch_per_second=state.peak_ground_velocity.speed.to(
+                            "inches/second"
+                        ).magnitude
+                        if state.peak_ground_velocity
+                        else None,
+                    )
+                    session.add(record)
+
+            session.commit()
+
+        logger.info(f"Asset system results exported to {db_path}")

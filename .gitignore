@@ -10,7 +10,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.db
 notebooks/*.csv
 erad_web/
 *.pdf 
@@ -140,3 +140,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .qodo
+uv.lock

@@ -1,8 +1,7 @@
 # Enumerations
 
+The main enumeration types are defined in `erad.enums`:
 
-```{eval-rst}
-.. automodule:: erad.enums
-    :members: ScenarioTypes, NodeTypes, AssetTypes
-
-```
+- `ScenarioTypes`
+- `NodeTypes`
+- `AssetTypes`
