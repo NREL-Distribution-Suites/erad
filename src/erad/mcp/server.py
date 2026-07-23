@@ -17,6 +17,7 @@ from .simulation import (
     load_distribution_model_tool,
     load_hazard_model_tool,
     create_hazard_system_tool,
+    create_forefire_hazard_tool,
     run_simulation_tool,
     generate_scenarios_tool,
 )
@@ -117,6 +118,70 @@ async def handle_list_tools() -> list[Tool]:
             name="create_hazard_system",
             description="Create a new empty hazard system. Returns a system ID.",
             inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="create_forefire_hazard",
+            description=(
+                "Build a wildfire hazard system by running a ForeFIRE fire-spread "
+                "simulation over a landscape NetCDF file from a chosen ignition point. "
+                "Returns a hazard system ID with time-stepped fire perimeters for use "
+                "in run_simulation."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "landscape_path": {
+                        "type": "string",
+                        "description": "Path to the ForeFIRE landscape NetCDF file (fuel, altitude, wind).",
+                    },
+                    "fuels_path": {
+                        "type": "string",
+                        "description": "Path to the fuels table CSV matching the landscape fuel indices.",
+                    },
+                    "ignition_lon": {
+                        "type": "number",
+                        "description": "Ignition longitude (WGS84).",
+                    },
+                    "ignition_lat": {
+                        "type": "number",
+                        "description": "Ignition latitude (WGS84).",
+                    },
+                    "ignition_time": {
+                        "type": "string",
+                        "description": "ISO-8601 ignition time (default 2025-01-01T00:00:00).",
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "description": "Total simulation duration in seconds (default 82800).",
+                        "default": 82800,
+                    },
+                    "step_seconds": {
+                        "type": "integer",
+                        "description": "Perimeter extraction step in seconds (default 10800).",
+                        "default": 10800,
+                    },
+                    "domain_bbox": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Optional [west, south, east, north] bounds metadata.",
+                    },
+                    "wind_u": {
+                        "type": "number",
+                        "description": "Optional constant eastward wind m/s (0 uses landscape wind).",
+                        "default": 0.0,
+                    },
+                    "wind_v": {
+                        "type": "number",
+                        "description": "Optional constant northward wind m/s (0 uses landscape wind).",
+                        "default": 0.0,
+                    },
+                    "extra_parameters": {
+                        "type": "object",
+                        "description": "Optional ForeFIRE setParameter overrides (propagation tuning).",
+                    },
+                },
+                "required": ["landscape_path", "fuels_path", "ignition_lon", "ignition_lat"],
+            },
         ),
         Tool(
             name="run_simulation",
@@ -489,6 +554,7 @@ _TOOL_HANDLERS = {
     "load_distribution_model": load_distribution_model_tool,
     "load_hazard_model": load_hazard_model_tool,
     "create_hazard_system": create_hazard_system_tool,
+    "create_forefire_hazard": create_forefire_hazard_tool,
     "run_simulation": run_simulation_tool,
     "generate_scenarios": generate_scenarios_tool,
     "query_assets": query_assets_tool,
