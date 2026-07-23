@@ -66,25 +66,24 @@ def generate_scenarios(
         outaged_assets = set()
 
         for asset_id in asset_ids:
-            if asset_id in outaged_assets:
-                continue
-
             timestamps = timestamps_per_asset[asset_id]
             probs = probs_per_asset[asset_id]
-            randoms = np.random.random(len(timestamps))
-
-            for j, (ts, prob, rand_val) in enumerate(zip(timestamps, probs, randoms)):
-                if rand_val > prob and asset_id not in outaged_assets:
-                    all_tracked_changes.append(
-                        {
-                            "scenario_name": scenario_name,
-                            "timestamp": ts,
-                            "asset_id": asset_id,
-                            "asset_name": asset_names[asset_id],
-                        }
-                    )
-                    outaged_assets.add(asset_id)
-                    break
+            # Evaluate each asset once at its worst exposure (minimum survival
+            # across timesteps = the hazard's closest approach). Drawing an
+            # independent Bernoulli per timestep compounds a modest per-step
+            # failure probability into an unrealistically high one, which made
+            # assets fail far from a time-evolving hazard front.
+            worst_idx = int(np.argmin(probs))
+            if np.random.random() > probs[worst_idx]:
+                all_tracked_changes.append(
+                    {
+                        "scenario_name": scenario_name,
+                        "timestamp": timestamps[worst_idx],
+                        "asset_id": asset_id,
+                        "asset_name": asset_names[asset_id],
+                    }
+                )
+                outaged_assets.add(asset_id)
 
         logger.info(f"Sample {sample_idx + 1}/{n_samples}: {len(outaged_assets)} assets failed")
 
@@ -128,24 +127,21 @@ def generate_scenarios_fast(
     names_df = con.execute("SELECT asset_id, asset_name FROM assets").fetchdf()
     asset_name_map = dict(zip(names_df["asset_id"], names_df["asset_name"]))
 
+    # Evaluate each asset once at its worst exposure (minimum survival across
+    # timesteps = the hazard's closest approach), rather than an independent
+    # Bernoulli per timestep which compounds into unrealistically high failure.
+    worst_survival = surv_matrix.min(axis=1)  # (n_assets,)
+    worst_ts_idx = surv_matrix.argmin(axis=1)  # (n_assets,)
+
     all_tracked_changes = []
 
     for sample_idx in range(n_samples):
         scenario_name = f"sample_{sample_idx}"
-        random_matrix = np.random.random((n_assets, n_timestamps))
-
-        # Compare: failure where random > survival_probability
-        failures = random_matrix > surv_matrix  # Boolean matrix
-
-        # For each asset, find FIRST failure timestamp (matching original "once failed stays failed" logic)
-        # argmax on boolean finds first True; if no True, returns 0 (so check any)
-        has_failure = failures.any(axis=1)
-        first_failure_idx = failures.argmax(axis=1)
-
-        failed_asset_indices = np.where(has_failure)[0]
+        randoms = np.random.random(n_assets)
+        failed_asset_indices = np.where(randoms > worst_survival)[0]
 
         for asset_idx in failed_asset_indices:
-            ts_idx = first_failure_idx[asset_idx]
+            ts_idx = worst_ts_idx[asset_idx]
             asset_id = unique_assets[asset_idx]
             all_tracked_changes.append(
                 {
