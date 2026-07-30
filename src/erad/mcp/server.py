@@ -9,8 +9,18 @@ import sys
 from loguru import logger
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool
-import mcp.types as types
+from mcp.types import (
+    CallToolRequestParams,
+    CallToolResult,
+    ListResourcesRequest,
+    ListResourcesResult,
+    ListToolsRequest,
+    ListToolsResult,
+    ReadResourceRequestParams,
+    ReadResourceResult,
+    TextContent,
+    Tool,
+)
 
 # Import tool handlers
 from .simulation import (
@@ -61,21 +71,24 @@ from .resources import list_resources, read_resource
 app = Server("erad-mcp-server")
 
 
-@app.list_resources()
-async def handle_list_resources() -> list:
-    """List available resources."""
-    return await list_resources()
+async def _handle_list_resources(ctx, params: ListResourcesRequest) -> ListResourcesResult:
+    resources = await list_resources()
+    return ListResourcesResult(resources=resources)
 
 
-@app.read_resource()
-async def handle_read_resource(uri: str) -> str:
-    """Read a resource by URI."""
-    return await read_resource(uri)
+async def _handle_read_resource(ctx, params: ReadResourceRequestParams) -> ReadResourceResult:
+    uri = str(params.uri)
+    contents = await read_resource(uri)
+    return ReadResourceResult(contents=contents)
 
 
-@app.list_tools()
-async def handle_list_tools() -> list[Tool]:
-    """List available MCP tools."""
+async def _handle_list_tools(ctx, params: ListToolsRequest) -> ListToolsResult:
+    tools = _get_tools()
+    return ListToolsResult(tools=tools)
+
+
+def _get_tools() -> list[Tool]:
+    """Return available MCP tools."""
     return [
         # Simulation Tools
         Tool(
@@ -581,9 +594,10 @@ _TOOL_HANDLERS = {
 }
 
 
-@app.call_tool()
-async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+async def _handle_call_tool(ctx, params: CallToolRequestParams) -> CallToolResult:
     """Handle tool calls."""
+    name = params.name
+    arguments = params.arguments or {}
     try:
         handler = _TOOL_HANDLERS.get(name)
         if handler is None:
@@ -591,11 +605,21 @@ async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent
         else:
             result = await handler(arguments)
 
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+        )
 
     except Exception as e:
         logger.error(f"Error in tool {name}: {e}", exc_info=True)
-        return [types.TextContent(type="text", text=json.dumps({"error": str(e), "tool": name}))]
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"error": str(e), "tool": name}))]
+        )
+
+
+app.add_request_handler("tools/list", ListToolsRequest, _handle_list_tools)
+app.add_request_handler("tools/call", CallToolRequestParams, _handle_call_tool)
+app.add_request_handler("resources/list", ListResourcesRequest, _handle_list_resources)
+app.add_request_handler("resources/read", ReadResourceRequestParams, _handle_read_resource)
 
 
 async def serve():
