@@ -93,12 +93,22 @@ def compute_survival_probabilities(con: duckdb.DuckDBPyConnection):
             continue
 
         # Build the CDF expression as a correlated subquery
+        # 'expon' encodes the wildfire model: failure probability decays with
+        # distance from the fire boundary as P_max * exp(-dist / L), where
+        # param_1 = L (decay length, km) and param_2 = P_max. Assets inside the
+        # burned polygon (fire_distance_km <= 0) are a certain outage (failure 1.0
+        # -> survival 0.0).
         cdf_sql = f"""
         COALESCE(
             (SELECT
                 CASE fc.distribution
                     WHEN 'norm' THEN normal_cdf(s.{col_name}, fc.param_1, fc.param_2)
                     WHEN 'lognorm' THEN lognormal_cdf(s.{col_name}, fc.param_1, fc.param_2, fc.param_3)
+                    WHEN 'expon' THEN
+                        CASE
+                            WHEN s.{col_name} <= 0 THEN 1.0
+                            ELSE LEAST(1.0, fc.param_2 * exp(-s.{col_name} / NULLIF(fc.param_1, 0)))
+                        END
                     ELSE 0.0
                 END
             FROM fragility_curves fc
@@ -186,6 +196,13 @@ def _compute_survival_iterative(con: duckdb.DuckDBPyConnection):
                 cdf_expr = f"normal_cdf(asset_states.{col_name}, {p1}, {p2})"
             elif distribution == "lognorm":
                 cdf_expr = f"lognormal_cdf(asset_states.{col_name}, {p1}, {p2}, {p3})"
+            elif distribution == "expon":
+                # Wildfire: failure = P_max * exp(-dist / L); inside the boundary
+                # (dist <= 0) is a certain outage. param_1 = L (km), param_2 = P_max.
+                cdf_expr = (
+                    f"CASE WHEN asset_states.{col_name} <= 0 THEN 1.0 "
+                    f"ELSE LEAST(1.0, {p2} * exp(-asset_states.{col_name} / NULLIF({p1}, 0))) END"
+                )
             else:
                 continue
 

@@ -9,14 +9,25 @@ import sys
 from loguru import logger
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool
-import mcp.types as types
+from mcp.types import (
+    CallToolRequestParams,
+    CallToolResult,
+    ListResourcesRequest,
+    ListResourcesResult,
+    ListToolsRequest,
+    ListToolsResult,
+    ReadResourceRequestParams,
+    ReadResourceResult,
+    TextContent,
+    Tool,
+)
 
 # Import tool handlers
 from .simulation import (
     load_distribution_model_tool,
     load_hazard_model_tool,
     create_hazard_system_tool,
+    create_forefire_hazard_tool,
     run_simulation_tool,
     generate_scenarios_tool,
 )
@@ -60,21 +71,24 @@ from .resources import list_resources, read_resource
 app = Server("erad-mcp-server")
 
 
-@app.list_resources()
-async def handle_list_resources() -> list:
-    """List available resources."""
-    return await list_resources()
+async def _handle_list_resources(ctx, params: ListResourcesRequest) -> ListResourcesResult:
+    resources = await list_resources()
+    return ListResourcesResult(resources=resources)
 
 
-@app.read_resource()
-async def handle_read_resource(uri: str) -> str:
-    """Read a resource by URI."""
-    return await read_resource(uri)
+async def _handle_read_resource(ctx, params: ReadResourceRequestParams) -> ReadResourceResult:
+    uri = str(params.uri)
+    contents = await read_resource(uri)
+    return ReadResourceResult(contents=contents)
 
 
-@app.list_tools()
-async def handle_list_tools() -> list[Tool]:
-    """List available MCP tools."""
+async def _handle_list_tools(ctx, params: ListToolsRequest) -> ListToolsResult:
+    tools = _get_tools()
+    return ListToolsResult(tools=tools)
+
+
+def _get_tools() -> list[Tool]:
+    """Return available MCP tools."""
     return [
         # Simulation Tools
         Tool(
@@ -117,6 +131,70 @@ async def handle_list_tools() -> list[Tool]:
             name="create_hazard_system",
             description="Create a new empty hazard system. Returns a system ID.",
             inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="create_forefire_hazard",
+            description=(
+                "Build a wildfire hazard system by running a ForeFIRE fire-spread "
+                "simulation over a landscape NetCDF file from a chosen ignition point. "
+                "Returns a hazard system ID with time-stepped fire perimeters for use "
+                "in run_simulation."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "landscape_path": {
+                        "type": "string",
+                        "description": "Path to the ForeFIRE landscape NetCDF file (fuel, altitude, wind).",
+                    },
+                    "fuels_path": {
+                        "type": "string",
+                        "description": "Path to the fuels table CSV matching the landscape fuel indices.",
+                    },
+                    "ignition_lon": {
+                        "type": "number",
+                        "description": "Ignition longitude (WGS84).",
+                    },
+                    "ignition_lat": {
+                        "type": "number",
+                        "description": "Ignition latitude (WGS84).",
+                    },
+                    "ignition_time": {
+                        "type": "string",
+                        "description": "ISO-8601 ignition time (default 2025-01-01T00:00:00).",
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "description": "Total simulation duration in seconds (default 82800).",
+                        "default": 82800,
+                    },
+                    "step_seconds": {
+                        "type": "integer",
+                        "description": "Perimeter extraction step in seconds (default 10800).",
+                        "default": 10800,
+                    },
+                    "domain_bbox": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Optional [west, south, east, north] bounds metadata.",
+                    },
+                    "wind_u": {
+                        "type": "number",
+                        "description": "Optional constant eastward wind m/s (0 uses landscape wind).",
+                        "default": 0.0,
+                    },
+                    "wind_v": {
+                        "type": "number",
+                        "description": "Optional constant northward wind m/s (0 uses landscape wind).",
+                        "default": 0.0,
+                    },
+                    "extra_parameters": {
+                        "type": "object",
+                        "description": "Optional ForeFIRE setParameter overrides (propagation tuning).",
+                    },
+                },
+                "required": ["landscape_path", "fuels_path", "ignition_lon", "ignition_lat"],
+            },
         ),
         Tool(
             name="run_simulation",
@@ -489,6 +567,7 @@ _TOOL_HANDLERS = {
     "load_distribution_model": load_distribution_model_tool,
     "load_hazard_model": load_hazard_model_tool,
     "create_hazard_system": create_hazard_system_tool,
+    "create_forefire_hazard": create_forefire_hazard_tool,
     "run_simulation": run_simulation_tool,
     "generate_scenarios": generate_scenarios_tool,
     "query_assets": query_assets_tool,
@@ -515,9 +594,10 @@ _TOOL_HANDLERS = {
 }
 
 
-@app.call_tool()
-async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+async def _handle_call_tool(ctx, params: CallToolRequestParams) -> CallToolResult:
     """Handle tool calls."""
+    name = params.name
+    arguments = params.arguments or {}
     try:
         handler = _TOOL_HANDLERS.get(name)
         if handler is None:
@@ -525,11 +605,21 @@ async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent
         else:
             result = await handler(arguments)
 
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(result, indent=2))]
+        )
 
     except Exception as e:
         logger.error(f"Error in tool {name}: {e}", exc_info=True)
-        return [types.TextContent(type="text", text=json.dumps({"error": str(e), "tool": name}))]
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps({"error": str(e), "tool": name}))]
+        )
+
+
+app.add_request_handler("tools/list", ListToolsRequest, _handle_list_tools)
+app.add_request_handler("tools/call", CallToolRequestParams, _handle_call_tool)
+app.add_request_handler("resources/list", ListResourcesRequest, _handle_list_resources)
+app.add_request_handler("resources/read", ReadResourceRequestParams, _handle_read_resource)
 
 
 async def serve():

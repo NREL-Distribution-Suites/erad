@@ -181,63 +181,37 @@ def _compute_flood_vectors_fallback(con: duckdb.DuckDBPyConnection):
 
 
 def compute_fire_vectors(con: duckdb.DuckDBPyConnection):
-    """Compute fire boundary distance for all assets."""
+    """Compute each asset's geodesic distance (km) to the nearest fire boundary.
+
+    Assets inside a burned polygon get distance 0.0; assets outside get the true
+    great-circle distance in kilometres to the nearest boundary point. Shapely's
+    planar operation is only used to *locate* the nearest point on the boundary
+    (adequate for the small areas involved); the distance itself is then measured
+    geodesically so the fragility decay length stays in real kilometres rather
+    than degrees of latitude/longitude.
+    """
     count = con.execute("SELECT COUNT(*) FROM fire_models").fetchone()[0]
     if count == 0:
         return
 
-    # Try spatial extension
-    try:
-        con.execute("LOAD spatial;")
-        _compute_fire_vectors_spatial(con)
-    except Exception:
-        _compute_fire_vectors_fallback(con)
+    from collections import defaultdict
 
-    logger.info(f"Computed fire vectors for all assets × {count} fire areas")
-
-
-def _compute_fire_vectors_spatial(con: duckdb.DuckDBPyConnection):
-    """Fire distance computation using DuckDB spatial extension."""
-    # For fire, we need the minimum distance to any fire boundary
-    # If inside, distance = 0; otherwise distance to exterior
-    con.execute(
-        """
-        INSERT OR REPLACE INTO asset_states (asset_id, timestamp, fire_distance_km)
-        SELECT
-            a.asset_id,
-            f.timestamp,
-            CASE
-                WHEN ST_Contains(ST_GeomFromText(f.polygon_wkt), ST_Point(a.longitude, a.latitude))
-                THEN 0.0
-                ELSE ST_Distance(
-                    ST_GeomFromText(f.polygon_wkt),
-                    ST_Point(a.longitude, a.latitude)
-                )
-            END AS fire_distance_km
-        FROM assets a
-        CROSS JOIN fire_models f
-    """
-    )
-
-
-def _compute_fire_vectors_fallback(con: duckdb.DuckDBPyConnection):
-    """Fallback fire distance computation using shapely."""
+    from geopy.distance import geodesic
     from shapely import wkt
     from shapely.geometry import Point
+    from shapely.ops import nearest_points
 
     fire_areas = con.execute(
         "SELECT hazard_id, timestamp, area_idx, polygon_wkt FROM fire_models"
     ).fetchall()
-
     if not fire_areas:
         return
 
     assets = con.execute("SELECT asset_id, latitude, longitude FROM assets").fetchall()
 
-    # Group fire areas by (hazard_id, timestamp)
-    from collections import defaultdict
-
-    grouped = defaultdict(list)
+    # Group fire areas by (hazard_id, timestamp) so an asset's distance is the
+    # minimum over all fronts present at that time.
+    grouped: dict[tuple, list] = defaultdict(list)
     for hazard_id, timestamp, area_idx, polygon_wkt in fire_areas:
         grouped[(hazard_id, timestamp)].append(wkt.loads(polygon_wkt))
 
@@ -245,17 +219,21 @@ def _compute_fire_vectors_fallback(con: duckdb.DuckDBPyConnection):
     for (hazard_id, timestamp), polygons in grouped.items():
         for asset_id, lat, lon in assets:
             point = Point(lon, lat)
-            min_dist = float("inf")
+            min_km = float("inf")
             for poly in polygons:
                 if poly.contains(point):
-                    min_dist = 0.0
+                    min_km = 0.0
                     break
-                dist = poly.exterior.distance(point)
-                min_dist = min(min_dist, dist)
-            results.append((asset_id, timestamp, min_dist))
+                boundary_pt = nearest_points(poly.exterior, point)[0]
+                dist_km = geodesic((lat, lon), (boundary_pt.y, boundary_pt.x)).km
+                if dist_km < min_km:
+                    min_km = dist_km
+            results.append((asset_id, timestamp, min_km))
 
     if results:
         con.executemany(
             "INSERT OR REPLACE INTO asset_states (asset_id, timestamp, fire_distance_km) VALUES (?, ?, ?)",
             results,
         )
+
+    logger.info(f"Computed fire vectors for all assets × {count} fire areas")
