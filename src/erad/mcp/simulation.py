@@ -198,7 +198,110 @@ _FOREFIRE_DEFAULT_PARAMS = {
 }
 
 
-async def create_forefire_hazard_tool(args: dict) -> dict:  # noqa: C901
+def _parse_forefire_args(args: dict) -> dict:
+    """Validate and normalize arguments for the ForeFIRE hazard tool."""
+    from datetime import datetime as _dt
+
+    landscape_path = args.get("landscape_path")
+    fuels_path = args.get("fuels_path")
+    if not landscape_path or not fuels_path:
+        raise ValueError("landscape_path and fuels_path are required")
+    if "ignition_lon" not in args or "ignition_lat" not in args:
+        raise ValueError("ignition_lon and ignition_lat are required")
+
+    landscape = Path(landscape_path)
+    fuels = Path(fuels_path)
+    if not landscape.exists():
+        raise FileNotFoundError(f"Landscape file not found: {landscape}")
+    if not fuels.exists():
+        raise FileNotFoundError(f"Fuels file not found: {fuels}")
+
+    ignition_time_raw = args.get("ignition_time")
+    if ignition_time_raw:
+        ignition_time = _dt.fromisoformat(str(ignition_time_raw).replace("Z", "+00:00"))
+    else:
+        ignition_time = _dt(2025, 1, 1, 0, 0, 0)
+
+    bbox = args.get("domain_bbox")
+    if bbox and len(bbox) == 4:
+        domain_bbox = tuple(float(v) for v in bbox)
+    else:
+        lon = float(args["ignition_lon"])
+        lat = float(args["ignition_lat"])
+        domain_bbox = (lon - 0.5, lat - 0.5, lon + 0.5, lat + 0.5)
+
+    return {
+        "landscape": landscape,
+        "fuels": fuels,
+        "ignition_lon": float(args["ignition_lon"]),
+        "ignition_lat": float(args["ignition_lat"]),
+        "ignition_time": ignition_time,
+        "duration_seconds": int(args.get("duration_seconds", 82800)),
+        "step_seconds": int(args.get("step_seconds", 10800)),
+        "wind_u": float(args.get("wind_u", 0.0)),
+        "wind_v": float(args.get("wind_v", 0.0)),
+        "domain_bbox": domain_bbox,
+        "extra_parameters": args.get("extra_parameters") or dict(_FOREFIRE_DEFAULT_PARAMS),
+    }
+
+
+def _fire_perimeter_rings(area) -> list:
+    """Extract [lon, lat] coordinate rings from a fire-affected area geometry."""
+    polys = getattr(area, "geoms", None) or [area]
+    rings = []
+    for poly in polys:
+        exterior = getattr(poly, "exterior", None)
+        if exterior is None:
+            continue
+        rings.append([[round(c[0], 6), round(c[1], 6)] for c in exterior.coords])
+    return rings
+
+
+def _format_forefire_result(system_id: str, fire_models: list, config) -> dict:
+    """Build the response payload from a completed ForeFIRE simulation."""
+    lons = [
+        b
+        for fm in fire_models
+        for b in (
+            fm.affected_areas[0].affected_area.bounds[0],
+            fm.affected_areas[0].affected_area.bounds[2],
+        )
+    ]
+    lats = [
+        b
+        for fm in fire_models
+        for b in (
+            fm.affected_areas[0].affected_area.bounds[1],
+            fm.affected_areas[0].affected_area.bounds[3],
+        )
+    ]
+    perimeters = [
+        {
+            "timestamp": fm.timestamp.isoformat(),
+            "rings": [
+                ring
+                for fma in fm.affected_areas
+                for ring in _fire_perimeter_rings(fma.affected_area)
+            ],
+        }
+        for fm in fire_models
+    ]
+    return {
+        "success": True,
+        "system_id": system_id,
+        "hazard_count": len(fire_models),
+        "timestamps": [fm.timestamp.isoformat() for fm in fire_models],
+        "bounds": [round(v, 6) for v in [min(lons), min(lats), max(lons), max(lats)]],
+        "ignition": [config.ignition_lon, config.ignition_lat],
+        "perimeters": perimeters,
+        "message": (
+            f"ForeFIRE wildfire hazard system created with {len(fire_models)} "
+            "time-stepped fire perimeters."
+        ),
+    }
+
+
+async def create_forefire_hazard_tool(args: dict) -> dict:
     """Build a wildfire hazard system from a ForeFIRE propagation simulation.
 
     Runs the erad-plugin-forefire physics simulation over a landscape NetCDF
@@ -206,8 +309,6 @@ async def create_forefire_hazard_tool(args: dict) -> dict:  # noqa: C901
     time-stepped HazardSystem for use by run_simulation.
     """
     try:
-        from datetime import datetime as _dt
-
         try:
             from erad_plugin_forefire import ForefireConfig, run_forefire_scenario
             from erad.models.hazard.wild_fire import FireModel
@@ -219,54 +320,23 @@ async def create_forefire_hazard_tool(args: dict) -> dict:  # noqa: C901
                 )
             }
 
-        landscape_path = args.get("landscape_path")
-        fuels_path = args.get("fuels_path")
-        if not landscape_path or not fuels_path:
-            return {"error": "landscape_path and fuels_path are required"}
-        if "ignition_lon" not in args or "ignition_lat" not in args:
-            return {"error": "ignition_lon and ignition_lat are required"}
-
-        landscape = Path(landscape_path)
-        fuels = Path(fuels_path)
-        if not landscape.exists():
-            return {"error": f"Landscape file not found: {landscape}"}
-        if not fuels.exists():
-            return {"error": f"Fuels file not found: {fuels}"}
-
-        ignition_time_raw = args.get("ignition_time")
-        if ignition_time_raw:
-            ignition_time = _dt.fromisoformat(str(ignition_time_raw).replace("Z", "+00:00"))
-        else:
-            ignition_time = _dt(2025, 1, 1, 0, 0, 0)
-
-        bbox = args.get("domain_bbox")
-        if bbox and len(bbox) == 4:
-            domain_bbox = tuple(float(v) for v in bbox)
-        else:
-            # domain_bbox is metadata only; the landscape NetCDF defines the
-            # actual grid. Default to a degree box around the ignition point.
-            lon = float(args["ignition_lon"])
-            lat = float(args["ignition_lat"])
-            domain_bbox = (lon - 0.5, lat - 0.5, lon + 0.5, lat + 0.5)
-
-        extra_parameters = args.get("extra_parameters") or dict(_FOREFIRE_DEFAULT_PARAMS)
-
+        parsed = _parse_forefire_args(args)
         config = ForefireConfig(
-            landscape_path=landscape,
-            fuels_path=fuels,
-            ignition_lon=float(args["ignition_lon"]),
-            ignition_lat=float(args["ignition_lat"]),
-            ignition_time=ignition_time,
-            duration_seconds=int(args.get("duration_seconds", 82800)),
-            step_seconds=int(args.get("step_seconds", 10800)),
-            wind_u=float(args.get("wind_u", 0.0)),
-            wind_v=float(args.get("wind_v", 0.0)),
-            domain_bbox=domain_bbox,
-            extra_parameters=extra_parameters,
+            landscape_path=parsed["landscape"],
+            fuels_path=parsed["fuels"],
+            ignition_lon=parsed["ignition_lon"],
+            ignition_lat=parsed["ignition_lat"],
+            ignition_time=parsed["ignition_time"],
+            duration_seconds=parsed["duration_seconds"],
+            step_seconds=parsed["step_seconds"],
+            wind_u=parsed["wind_u"],
+            wind_v=parsed["wind_v"],
+            domain_bbox=parsed["domain_bbox"],
+            extra_parameters=parsed["extra_parameters"],
         )
 
         logger.info(
-            f"Running ForeFIRE scenario: landscape={landscape.name}, "
+            f"Running ForeFIRE scenario: landscape={parsed['landscape'].name}, "
             f"ignition=({config.ignition_lon},{config.ignition_lat}), "
             f"duration={config.duration_seconds}s, step={config.step_seconds}s"
         )
@@ -285,62 +355,10 @@ async def create_forefire_hazard_tool(args: dict) -> dict:  # noqa: C901
         system_id = state.generate_id()
         state.hazard_systems[system_id] = hazard_system
 
-        lons = [
-            b
-            for fm in fire_models
-            for b in (
-                fm.affected_areas[0].affected_area.bounds[0],
-                fm.affected_areas[0].affected_area.bounds[2],
-            )
-        ]
-        lats = [
-            b
-            for fm in fire_models
-            for b in (
-                fm.affected_areas[0].affected_area.bounds[1],
-                fm.affected_areas[0].affected_area.bounds[3],
-            )
-        ]
-        combined_bounds = [min(lons), min(lats), max(lons), max(lats)]
-
-        # Per-timestep fire-front polygons as [lon, lat] rings, so a UI can
-        # animate the spread. Coordinates are rounded to keep the payload small.
-        def _rings(area) -> list:
-            polys = getattr(area, "geoms", None) or [area]
-            rings = []
-            for poly in polys:
-                exterior = getattr(poly, "exterior", None)
-                if exterior is None:
-                    continue
-                # ForeFIRE polygons carry a z coordinate; keep only lon/lat.
-                rings.append([[round(c[0], 6), round(c[1], 6)] for c in exterior.coords])
-            return rings
-
-        perimeters = [
-            {
-                "timestamp": fm.timestamp.isoformat(),
-                "rings": [ring for fma in fm.affected_areas for ring in _rings(fma.affected_area)],
-            }
-            for fm in fire_models
-        ]
-
         logger.info(
             f"Created ForeFIRE hazard system {system_id} with {len(fire_models)} fire perimeters"
         )
-
-        return {
-            "success": True,
-            "system_id": system_id,
-            "hazard_count": len(fire_models),
-            "timestamps": [fm.timestamp.isoformat() for fm in fire_models],
-            "bounds": [round(v, 6) for v in combined_bounds],
-            "ignition": [config.ignition_lon, config.ignition_lat],
-            "perimeters": perimeters,
-            "message": (
-                f"ForeFIRE wildfire hazard system created with {len(fire_models)} "
-                "time-stepped fire perimeters."
-            ),
-        }
+        return _format_forefire_result(system_id, fire_models, config)
 
     except Exception as e:
         logger.error(f"Error creating ForeFIRE hazard: {e}")
