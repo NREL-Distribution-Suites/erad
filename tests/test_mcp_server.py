@@ -668,14 +668,14 @@ class TestServerWiring:
     """Test the MCPServer wiring from create_server()."""
 
     @pytest.mark.asyncio
-    async def test_all_31_tools_registered(self):
-        """create_server() should register the full 31-tool surface."""
+    async def test_all_33_tools_registered(self):
+        """create_server() should register the full 33-tool surface."""
         from erad.mcp.server import create_server
 
         server = create_server()
         tools = await server.list_tools()
         tool_names = {tool.name for tool in tools}
-        assert len(tools) == 31
+        assert len(tools) == 33
         assert tool_names == {
             "load_distribution_model",
             "load_hazard_model",
@@ -708,19 +708,21 @@ class TestServerWiring:
             "list_asset_types",
             "list_loaded_systems",
             "clear_system",
+            "list_plugins",
+            "get_plugin",
         }
 
     @pytest.mark.asyncio
     async def test_resource_templates_and_catalog(self):
-        """Static catalog resource plus the three template resources are registered."""
+        """Static catalog/plugins resources plus the three template resources are registered."""
         from erad.mcp.server import create_server
 
         server = create_server()
         resources = await server.list_resources()
         templates = await server.list_resource_templates()
 
-        # Static resources are listed individually; the catalog is the only static one.
-        assert {str(r.uri) for r in resources} == {"erad://catalog"}
+        # Static resources are listed individually; the catalog and plugins index are static.
+        assert {str(r.uri) for r in resources} == {"erad://catalog", "erad://plugins"}
         # Templates are not expanded per-item.
         assert {t.uri_template for t in templates} == {
             "erad://docs/{doc_path}",

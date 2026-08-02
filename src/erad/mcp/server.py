@@ -30,6 +30,7 @@ def create_server() -> MCPServer:
     from .cache import register as register_cache
     from .documentation import register as register_documentation
     from .utilities import register as register_utilities
+    from .plugins import register as register_plugins
 
     register_simulation(mcp)
     register_assets(mcp)
@@ -39,6 +40,7 @@ def create_server() -> MCPServer:
     register_cache(mcp)
     register_documentation(mcp)
     register_utilities(mcp)
+    register_plugins(mcp)
 
     # -- Register resources ----------------------------------------------------
     from .resources import register as register_resources

@@ -325,7 +325,15 @@ async def create_forefire_hazard(
     """
     try:
         try:
-            from erad_plugin_forefire import ForefireConfig, run_forefire_scenario
+            from erad.plugins import get_plugin, load_plugin
+
+            if get_plugin("forefire") is None:
+                raise ImportError("erad-plugin-forefire plugin is not installed")
+            forefire_module = load_plugin("forefire")
+            if forefire_module is None:
+                raise ImportError("erad-plugin-forefire module could not be loaded")
+            ForefireConfig = forefire_module.ForefireConfig
+            run_forefire_scenario = forefire_module.run_forefire_scenario
             from erad.models.hazard.wild_fire import FireModel
         except ImportError as exc:
             return {
