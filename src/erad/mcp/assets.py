@@ -5,6 +5,7 @@ Asset query tools for ERAD MCP Server.
 import statistics
 
 from loguru import logger
+from mcp.server import MCPServer
 
 from erad.models.asset import Asset
 
@@ -12,10 +13,31 @@ from .state import state
 from .helpers import serialize_asset
 
 
-async def query_assets_tool(args: dict) -> dict:
-    """Query assets with filters."""
-    asset_system_id = args["asset_system_id"]
+async def query_assets(
+    asset_system_id: str,
+    asset_type: str | None = None,
+    min_survival_probability: float | None = None,
+    max_survival_probability: float | None = None,
+    latitude_min: float | None = None,
+    latitude_max: float | None = None,
+    longitude_min: float | None = None,
+    longitude_max: float | None = None,
+) -> dict:
+    """Query and filter assets from a loaded asset system.
 
+    Args:
+        asset_system_id: ID of loaded asset system.
+        asset_type: Filter by asset type (optional).
+        min_survival_probability: Minimum survival probability threshold (optional).
+        max_survival_probability: Maximum survival probability threshold (optional).
+        latitude_min: Minimum latitude for bounding box (optional).
+        latitude_max: Maximum latitude for bounding box (optional).
+        longitude_min: Minimum longitude for bounding box (optional).
+        longitude_max: Maximum longitude for bounding box (optional).
+
+    Returns:
+        JSON payload with the filtered asset list, or an error payload.
+    """
     try:
         if asset_system_id not in state.asset_systems:
             return {"error": f"Asset system not found: {asset_system_id}"}
@@ -27,29 +49,28 @@ async def query_assets_tool(args: dict) -> dict:
         filtered_assets = assets
 
         # Filter by asset type
-        if "asset_type" in args and args["asset_type"]:
-            asset_type_str = args["asset_type"]
+        if asset_type:
             filtered_assets = [
                 a
                 for a in filtered_assets
-                if (hasattr(a.asset_type, "value") and a.asset_type.value == asset_type_str)
-                or str(a.asset_type) == asset_type_str
+                if (hasattr(a.asset_type, "value") and a.asset_type.value == asset_type)
+                or str(a.asset_type) == asset_type
             ]
 
         # Filter by location bounds
-        if "latitude_min" in args and args["latitude_min"] is not None:
-            filtered_assets = [a for a in filtered_assets if a.latitude >= args["latitude_min"]]
-        if "latitude_max" in args and args["latitude_max"] is not None:
-            filtered_assets = [a for a in filtered_assets if a.latitude <= args["latitude_max"]]
-        if "longitude_min" in args and args["longitude_min"] is not None:
-            filtered_assets = [a for a in filtered_assets if a.longitude >= args["longitude_min"]]
-        if "longitude_max" in args and args["longitude_max"] is not None:
-            filtered_assets = [a for a in filtered_assets if a.longitude <= args["longitude_max"]]
+        if latitude_min is not None:
+            filtered_assets = [a for a in filtered_assets if a.latitude >= latitude_min]
+        if latitude_max is not None:
+            filtered_assets = [a for a in filtered_assets if a.latitude <= latitude_max]
+        if longitude_min is not None:
+            filtered_assets = [a for a in filtered_assets if a.longitude >= longitude_min]
+        if longitude_max is not None:
+            filtered_assets = [a for a in filtered_assets if a.longitude <= longitude_max]
 
         # Filter by survival probability
-        if "min_survival_probability" in args or "max_survival_probability" in args:
-            min_prob = args.get("min_survival_probability", 0.0)
-            max_prob = args.get("max_survival_probability", 1.0)
+        if min_survival_probability is not None or max_survival_probability is not None:
+            min_prob = min_survival_probability if min_survival_probability is not None else 0.0
+            max_prob = max_survival_probability if max_survival_probability is not None else 1.0
 
             filtered_assets = [
                 a
@@ -78,11 +99,16 @@ async def query_assets_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def get_asset_details_tool(args: dict) -> dict:
-    """Get details for a specific asset."""
-    asset_system_id = args["asset_system_id"]
-    asset_name = args["asset_name"]
+async def get_asset_details(asset_system_id: str, asset_name: str) -> dict:
+    """Get detailed information about a specific asset.
 
+    Args:
+        asset_system_id: ID of loaded asset system.
+        asset_name: Name of the asset.
+
+    Returns:
+        JSON payload with the asset details, or an error payload.
+    """
     try:
         if asset_system_id not in state.asset_systems:
             return {"error": f"Asset system not found: {asset_system_id}"}
@@ -107,10 +133,15 @@ async def get_asset_details_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def get_asset_statistics_tool(args: dict) -> dict:
-    """Calculate asset statistics."""
-    asset_system_id = args["asset_system_id"]
+async def get_asset_statistics(asset_system_id: str) -> dict:
+    """Calculate statistics about assets in the system.
 
+    Args:
+        asset_system_id: ID of loaded asset system.
+
+    Returns:
+        JSON payload with asset statistics, or an error payload.
+    """
     try:
         if asset_system_id not in state.asset_systems:
             return {"error": f"Asset system not found: {asset_system_id}"}
@@ -159,10 +190,15 @@ async def get_asset_statistics_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def get_network_topology_tool(args: dict) -> dict:
-    """Get network topology."""
-    asset_system_id = args["asset_system_id"]
+async def get_network_topology(asset_system_id: str) -> dict:
+    """Get network topology as node and edge lists.
 
+    Args:
+        asset_system_id: ID of loaded asset system.
+
+    Returns:
+        JSON payload with node and edge lists, or an error payload.
+    """
     try:
         if asset_system_id not in state.asset_systems:
             return {"error": f"Asset system not found: {asset_system_id}"}
@@ -190,3 +226,11 @@ async def get_network_topology_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error getting topology: {e}")
         return {"error": str(e)}
+
+
+def register(mcp: MCPServer) -> None:
+    """Register asset query tools with the MCP server."""
+    mcp.tool()(query_assets)
+    mcp.tool()(get_asset_details)
+    mcp.tool()(get_asset_statistics)
+    mcp.tool()(get_network_topology)

@@ -3,12 +3,17 @@ Fragility curve tools for ERAD MCP Server.
 """
 
 from loguru import logger
+from mcp.server import MCPServer
 
 from erad.default_fragility_curves import DEFAULT_FRAGILITY_CURVES
 
 
-async def list_fragility_curves_tool(args: dict) -> dict:
-    """List available fragility curves."""
+async def list_fragility_curves() -> dict:
+    """List available fragility curve sets and hazard types.
+
+    Returns:
+        JSON payload with curve sets and hazard types, or an error payload.
+    """
     try:
         # Get default curve sets
         curve_info = {}
@@ -34,11 +39,16 @@ async def list_fragility_curves_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def get_fragility_curve_parameters_tool(args: dict) -> dict:
-    """Get fragility curve parameters."""
-    hazard_type = args["hazard_type"]
-    asset_type_str = args["asset_type"]
+async def get_fragility_curve_parameters(hazard_type: str, asset_type: str) -> dict:
+    """Get fragility curve parameters for specific asset type and hazard.
 
+    Args:
+        hazard_type: Hazard type (wind_speed, flood_depth, etc.).
+        asset_type: Asset type.
+
+    Returns:
+        JSON payload with matching curves, or an error payload.
+    """
     try:
         # Find matching curves
         matching_curves = []
@@ -51,7 +61,7 @@ async def get_fragility_curve_parameters_tool(args: dict) -> dict:
                         if hasattr(curve.asset_type, "value")
                         else str(curve.asset_type)
                     )
-                    if curve_asset_type == asset_type_str:
+                    if curve_asset_type == asset_type:
                         matching_curves.append(
                             {
                                 "asset_type": curve_asset_type,
@@ -64,7 +74,7 @@ async def get_fragility_curve_parameters_tool(args: dict) -> dict:
         if not matching_curves:
             return {
                 "success": False,
-                "message": f"No curves found for hazard_type={hazard_type}, asset_type={asset_type_str}",
+                "message": f"No curves found for hazard_type={hazard_type}, asset_type={asset_type}",
             }
 
         return {"success": True, "curves": matching_curves}
@@ -72,3 +82,9 @@ async def get_fragility_curve_parameters_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error getting curve parameters: {e}")
         return {"error": str(e)}
+
+
+def register(mcp: MCPServer) -> None:
+    """Register fragility curve tools with the MCP server."""
+    mcp.tool()(list_fragility_curves)
+    mcp.tool()(get_fragility_curve_parameters)

@@ -3,6 +3,7 @@ Utility tools for ERAD MCP Server.
 """
 
 from loguru import logger
+from mcp.server import MCPServer
 
 from erad.enums import AssetTypes
 from erad.models.asset import Asset
@@ -11,8 +12,12 @@ from erad.constants import HAZARD_TYPES
 from .state import state
 
 
-async def list_asset_types_tool(args: dict) -> dict:
-    """List available asset types."""
+async def list_asset_types() -> dict:
+    """List all available asset types in ERAD.
+
+    Returns:
+        JSON payload with the asset type list, or an error payload.
+    """
     try:
         # Get string values from enum
         asset_types = [at.name for at in AssetTypes]
@@ -24,8 +29,12 @@ async def list_asset_types_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def list_loaded_systems_tool(args: dict) -> dict:
-    """List all loaded systems."""
+async def list_loaded_systems() -> dict:
+    """List all currently loaded asset and hazard systems.
+
+    Returns:
+        JSON payload with the loaded systems, or an error payload.
+    """
     try:
         asset_systems = {}
         for system_id, asset_system in state.asset_systems.items():
@@ -61,11 +70,16 @@ async def list_loaded_systems_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def clear_system_tool(args: dict) -> dict:
-    """Clear a system from memory."""
-    system_id = args["system_id"]
-    system_type = args["system_type"]
+async def clear_system(system_id: str, system_type: str) -> dict:
+    """Remove a loaded system from memory.
 
+    Args:
+        system_id: ID of system to remove.
+        system_type: 'asset', 'hazard', or 'simulation'.
+
+    Returns:
+        JSON payload confirming removal, or an error payload.
+    """
     try:
         if system_type == "asset":
             if system_id in state.asset_systems:
@@ -99,3 +113,10 @@ async def clear_system_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error clearing system: {e}")
         return {"error": str(e)}
+
+
+def register(mcp: MCPServer) -> None:
+    """Register utility tools with the MCP server."""
+    mcp.tool()(list_asset_types)
+    mcp.tool()(list_loaded_systems)
+    mcp.tool()(clear_system)

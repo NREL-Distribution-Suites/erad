@@ -5,13 +5,20 @@ Documentation search tools for ERAD MCP Server.
 from pathlib import Path
 
 from loguru import logger
+from mcp.server import MCPServer
 
 
-async def search_documentation_tool(args: dict) -> dict:
-    """Search documentation."""
-    query = args["query"].lower()
+async def search_documentation(query: str) -> dict:
+    """Search ERAD documentation for specific topics.
 
+    Args:
+        query: Search query.
+
+    Returns:
+        JSON payload with the search results, or an error payload.
+    """
     try:
+        query_lower = query.lower()
         docs_dir = Path(__file__).parent.parent.parent.parent / "docs"
         results = []
 
@@ -22,10 +29,12 @@ async def search_documentation_tool(args: dict) -> dict:
         for md_file in docs_dir.rglob("*.md"):
             try:
                 content = md_file.read_text(encoding="utf-8")
-                if query in content.lower():
+                if query_lower in content.lower():
                     # Get context around match
                     lines = content.split("\n")
-                    matching_lines = [i for i, line in enumerate(lines) if query in line.lower()]
+                    matching_lines = [
+                        i for i, line in enumerate(lines) if query_lower in line.lower()
+                    ]
 
                     snippets = []
                     for line_num in matching_lines[:3]:  # First 3 matches
@@ -50,3 +59,8 @@ async def search_documentation_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error searching documentation: {e}")
         return {"error": str(e)}
+
+
+def register(mcp: MCPServer) -> None:
+    """Register documentation tools with the MCP server."""
+    mcp.tool()(search_documentation)

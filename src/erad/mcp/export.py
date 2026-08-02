@@ -5,15 +5,21 @@ Export tools for ERAD MCP Server.
 import json
 
 from loguru import logger
+from mcp.server import MCPServer
 
 from .state import state
 
 
-async def export_to_sqlite_tool(args: dict) -> dict:
-    """Export simulation results to SQLite."""
-    asset_system_id = args["asset_system_id"]
-    output_path = args["output_path"]
+async def export_to_sqlite(asset_system_id: str, output_path: str) -> dict:
+    """Export simulation results to SQLite database.
 
+    Args:
+        asset_system_id: ID of asset system with results.
+        output_path: Output file path for SQLite database.
+
+    Returns:
+        JSON payload with the output path, or an error payload.
+    """
     try:
         if asset_system_id not in state.asset_systems:
             return {"error": f"Asset system not found: {asset_system_id}"}
@@ -34,12 +40,17 @@ async def export_to_sqlite_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def export_to_json_tool(args: dict) -> dict:
-    """Export system to JSON."""
-    system_id = args["system_id"]
-    system_type = args["system_type"]
-    output_path = args["output_path"]
+async def export_to_json(system_id: str, system_type: str, output_path: str) -> dict:
+    """Export asset or hazard system to JSON file.
 
+    Args:
+        system_id: ID of system to export.
+        system_type: Type of system: 'asset' or 'hazard'.
+        output_path: Output file path.
+
+    Returns:
+        JSON payload with the output path, or an error payload.
+    """
     try:
         if system_type == "asset":
             if system_id not in state.asset_systems:
@@ -67,11 +78,16 @@ async def export_to_json_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def export_tracked_changes_tool(args: dict) -> dict:
-    """Export tracked changes from Monte Carlo scenarios."""
-    simulation_id = args["simulation_id"]
-    output_path = args["output_path"]
+async def export_tracked_changes(simulation_id: str, output_path: str) -> dict:
+    """Export Monte Carlo scenario tracked changes to JSON.
 
+    Args:
+        simulation_id: ID of simulation with tracked changes.
+        output_path: Output file path.
+
+    Returns:
+        JSON payload with the output path and change count, or an error payload.
+    """
     try:
         if simulation_id not in state.simulation_results:
             return {"error": f"Simulation not found: {simulation_id}"}
@@ -127,11 +143,16 @@ def _get_engine(simulation_id: str):
     return engine
 
 
-async def export_parquet_tool(args: dict) -> dict:
-    """Export simulation results to Parquet format."""
-    simulation_id = args["simulation_id"]
-    output_path = args["output_path"]
+async def export_parquet(simulation_id: str, output_path: str) -> dict:
+    """Export simulation results to Parquet format.
 
+    Args:
+        simulation_id: ID of completed simulation.
+        output_path: Output file path for the Parquet file.
+
+    Returns:
+        JSON payload with the output path, or an error payload.
+    """
     try:
         engine = _get_engine(simulation_id)
 
@@ -149,11 +170,16 @@ async def export_parquet_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def export_csv_tool(args: dict) -> dict:
-    """Export simulation results to CSV format."""
-    simulation_id = args["simulation_id"]
-    output_path = args["output_path"]
+async def export_csv(simulation_id: str, output_path: str) -> dict:
+    """Export simulation results to CSV format.
 
+    Args:
+        simulation_id: ID of completed simulation.
+        output_path: Output file path for the CSV file.
+
+    Returns:
+        JSON payload with the output path, or an error payload.
+    """
     try:
         engine = _get_engine(simulation_id)
 
@@ -171,11 +197,16 @@ async def export_csv_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def get_failed_assets_tool(args: dict) -> dict:
-    """Get assets with survival probability below a threshold."""
-    simulation_id = args["simulation_id"]
-    threshold = args.get("threshold", 0.5)
+async def get_failed_assets(simulation_id: str, threshold: float = 0.5) -> dict:
+    """Get assets with survival probability below a threshold from a simulation.
 
+    Args:
+        simulation_id: ID of completed simulation.
+        threshold: Survival probability threshold (default 0.5).
+
+    Returns:
+        JSON payload with the failed asset list, or an error payload.
+    """
     try:
         engine = _get_engine(simulation_id)
 
@@ -203,3 +234,13 @@ async def get_failed_assets_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error getting failed assets: {e}")
         return {"error": str(e)}
+
+
+def register(mcp: MCPServer) -> None:
+    """Register export tools with the MCP server."""
+    mcp.tool()(export_to_sqlite)
+    mcp.tool()(export_to_json)
+    mcp.tool()(export_tracked_changes)
+    mcp.tool()(export_parquet)
+    mcp.tool()(export_csv)
+    mcp.tool()(get_failed_assets)

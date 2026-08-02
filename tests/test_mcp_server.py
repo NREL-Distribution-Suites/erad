@@ -12,29 +12,29 @@ from unittest.mock import Mock
 # Import from new modular structure
 from erad.mcp.state import ServerState, state
 from erad.mcp.simulation import (
-    create_hazard_system_tool,
+    create_hazard_system,
     _resolve_model_ref_to_path,
-    run_simulation_tool,
-    generate_scenarios_tool,
-    apply_scenario_to_system_tool,
+    run_simulation,
+    generate_scenarios,
+    apply_scenario_to_system,
 )
 from erad.mcp.export import (
-    export_csv_tool,
-    export_parquet_tool,
-    get_failed_assets_tool,
+    export_csv,
+    export_parquet,
+    get_failed_assets,
 )
 from erad.mcp.assets import (
-    query_assets_tool,
-    get_asset_statistics_tool,
+    query_assets,
+    get_asset_statistics,
 )
 from erad.mcp.utilities import (
-    list_asset_types_tool,
-    list_loaded_systems_tool,
+    list_asset_types,
+    list_loaded_systems,
 )
-from erad.mcp.cache import get_cache_info_tool
-from erad.mcp.fragility import list_fragility_curves_tool
-from erad.mcp.hazards import list_historic_hurricanes_tool
-from erad.mcp.hazards import load_historic_hurricane_tool
+from erad.mcp.cache import get_cache_info
+from erad.mcp.fragility import list_fragility_curves
+from erad.mcp.hazards import list_historic_hurricanes
+from erad.mcp.hazards import load_historic_hurricane
 from erad.models.hazard.wind import WindModel
 
 
@@ -87,7 +87,7 @@ class TestSimulationTools:
     @pytest.mark.asyncio
     async def test_create_hazard_system(self, clean_state):
         """Test creating a hazard system."""
-        result = await create_hazard_system_tool({})
+        result = await create_hazard_system()
 
         assert result["success"] is True
         assert "system_id" in result
@@ -96,8 +96,9 @@ class TestSimulationTools:
     @pytest.mark.asyncio
     async def test_run_simulation_missing_systems(self, clean_state):
         """Test simulation with missing systems."""
-        result = await run_simulation_tool(
-            {"asset_system_id": "nonexistent", "hazard_system_id": "nonexistent"}
+        result = await run_simulation(
+            asset_system_id="nonexistent",
+            hazard_system_id="nonexistent",
         )
 
         assert "error" in result
@@ -164,7 +165,7 @@ class TestAssetQueryTools:
     @pytest.mark.asyncio
     async def test_query_assets_missing_system(self, clean_state):
         """Test querying with missing system."""
-        result = await query_assets_tool({"asset_system_id": "nonexistent"})
+        result = await query_assets(asset_system_id="nonexistent")
 
         assert "error" in result
         assert "not found" in result["error"].lower()
@@ -172,7 +173,7 @@ class TestAssetQueryTools:
     @pytest.mark.asyncio
     async def test_get_asset_statistics_missing_system(self, clean_state):
         """Test statistics with missing system."""
-        result = await get_asset_statistics_tool({"asset_system_id": "nonexistent"})
+        result = await get_asset_statistics(asset_system_id="nonexistent")
 
         assert "error" in result
 
@@ -183,7 +184,7 @@ class TestUtilityTools:
     @pytest.mark.asyncio
     async def test_list_asset_types(self):
         """Test listing asset types."""
-        result = await list_asset_types_tool({})
+        result = await list_asset_types()
 
         assert result["success"] is True
         assert "asset_types" in result
@@ -193,7 +194,7 @@ class TestUtilityTools:
     @pytest.mark.asyncio
     async def test_list_loaded_systems_empty(self, clean_state):
         """Test listing systems when empty."""
-        result = await list_loaded_systems_tool({})
+        result = await list_loaded_systems()
 
         assert result["success"] is True
         assert len(result["asset_systems"]) == 0
@@ -203,7 +204,7 @@ class TestUtilityTools:
     @pytest.mark.asyncio
     async def test_get_cache_info(self):
         """Test getting cache information."""
-        result = await get_cache_info_tool({})
+        result = await get_cache_info()
 
         assert result["success"] is True
         assert "distribution_cache" in result
@@ -213,7 +214,7 @@ class TestUtilityTools:
     @pytest.mark.asyncio
     async def test_list_fragility_curves(self):
         """Test listing fragility curves."""
-        result = await list_fragility_curves_tool({})
+        result = await list_fragility_curves()
 
         assert result["success"] is True
         assert "curve_sets" in result
@@ -235,7 +236,7 @@ class TestUtilityTools:
 
         monkeypatch.setattr("erad.mcp.hazards.get_historic_hazard_db", lambda: db_path)
 
-        result = await list_historic_hurricanes_tool({"year": 2025, "limit": 10})
+        result = await list_historic_hurricanes(year=2025, limit=10)
 
         assert result["success"] is True
         assert result["count"] == 1
@@ -292,8 +293,8 @@ class TestUtilityTools:
             lambda _sid: [_WindPoint(0), _WindPoint(1)],
         )
 
-        result = await load_historic_hurricane_tool(
-            {"hazard_system_id": "hz1", "hurricane_sid": "2017106N36310"}
+        result = await load_historic_hurricane(
+            hazard_system_id="hz1", hurricane_sid="2017106N36310"
         )
 
         assert result["success"] is True
@@ -307,7 +308,7 @@ class TestFragilityCurveTools:
     @pytest.mark.asyncio
     async def test_list_curves(self):
         """Test listing available curves."""
-        result = await list_fragility_curves_tool({})
+        result = await list_fragility_curves()
 
         assert result["success"] is True
         assert len(result["hazard_types"]) > 0
@@ -320,12 +321,12 @@ class TestStatefulBehavior:
     async def test_create_and_list_hazard_system(self, clean_state):
         """Test creating system and then listing it."""
         # Create system
-        create_result = await create_hazard_system_tool({})
+        create_result = await create_hazard_system()
         assert create_result["success"] is True
         system_id = create_result["system_id"]
 
         # List systems
-        list_result = await list_loaded_systems_tool({})
+        list_result = await list_loaded_systems()
         assert list_result["success"] is True
         assert system_id in list_result["hazard_systems"]
 
@@ -336,7 +337,7 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_invalid_system_id(self, clean_state):
         """Test handling of invalid system IDs."""
-        result = await query_assets_tool({"asset_system_id": "invalid-id-12345"})
+        result = await query_assets(asset_system_id="invalid-id-12345")
 
         assert "error" in result
         assert "not found" in result["error"].lower()
@@ -364,12 +365,10 @@ class TestProvenanceManifest:
         state.hazard_systems[hazard_system_id] = hazard_system
 
         output_path = tmp_path / "simulation.json"
-        result = await run_simulation_tool(
-            {
-                "asset_system_id": asset_system_id,
-                "hazard_system_id": hazard_system_id,
-                "output_path": str(output_path),
-            }
+        result = await run_simulation(
+            asset_system_id=asset_system_id,
+            hazard_system_id=hazard_system_id,
+            output_path=str(output_path),
         )
 
         assert result["success"] is True
@@ -445,11 +444,9 @@ async def _run_failure_simulation():
     hazard_system_id = state.generate_id()
     state.hazard_systems[hazard_system_id] = hazard_system
 
-    result = await run_simulation_tool(
-        {
-            "asset_system_id": asset_system_id,
-            "hazard_system_id": hazard_system_id,
-        }
+    result = await run_simulation(
+        asset_system_id=asset_system_id,
+        hazard_system_id=hazard_system_id,
     )
     assert result["success"] is True, result
     return result["simulation_id"]
@@ -464,9 +461,7 @@ class TestEngineExportTools:
         simulation_id = await _run_failure_simulation()
         output_path = tmp_path / "results.parquet"
 
-        result = await export_parquet_tool(
-            {"simulation_id": simulation_id, "output_path": str(output_path)}
-        )
+        result = await export_parquet(simulation_id=simulation_id, output_path=str(output_path))
 
         assert result["success"] is True
         assert result["output_path"] == str(output_path)
@@ -479,9 +474,7 @@ class TestEngineExportTools:
         simulation_id = await _run_failure_simulation()
         output_path = tmp_path / "results.csv"
 
-        result = await export_csv_tool(
-            {"simulation_id": simulation_id, "output_path": str(output_path)}
-        )
+        result = await export_csv(simulation_id=simulation_id, output_path=str(output_path))
 
         assert result["success"] is True
         assert result["output_path"] == str(output_path)
@@ -491,8 +484,8 @@ class TestEngineExportTools:
     @pytest.mark.asyncio
     async def test_export_parquet_missing_simulation(self, clean_state, tmp_path):
         """Exporting with an unknown simulation should return an error."""
-        result = await export_parquet_tool(
-            {"simulation_id": "missing", "output_path": str(tmp_path / "x.parquet")}
+        result = await export_parquet(
+            simulation_id="missing", output_path=str(tmp_path / "x.parquet")
         )
 
         assert "error" in result
@@ -503,7 +496,7 @@ class TestEngineExportTools:
         """Failed asset queries should return assets below the survival threshold."""
         simulation_id = await _run_failure_simulation()
 
-        result = await get_failed_assets_tool({"simulation_id": simulation_id, "threshold": 0.5})
+        result = await get_failed_assets(simulation_id=simulation_id, threshold=0.5)
 
         assert result["success"] is True
         assert result["threshold"] == 0.5
@@ -520,7 +513,7 @@ class TestEngineExportTools:
         """Threshold should default to 0.5 when not provided."""
         simulation_id = await _run_failure_simulation()
 
-        result = await get_failed_assets_tool({"simulation_id": simulation_id})
+        result = await get_failed_assets(simulation_id=simulation_id)
 
         assert result["success"] is True
         assert result["threshold"] == 0.5
@@ -528,7 +521,7 @@ class TestEngineExportTools:
     @pytest.mark.asyncio
     async def test_get_failed_assets_missing_simulation(self, clean_state):
         """Failed asset queries with an unknown simulation should return an error."""
-        result = await get_failed_assets_tool({"simulation_id": "missing"})
+        result = await get_failed_assets(simulation_id="missing")
 
         assert "error" in result
         assert "not found" in result["error"].lower()
@@ -582,30 +575,26 @@ class TestApplyScenarioToSystem:
         state.hazard_systems[hazard_system_id] = hazard_system
 
         # Run the simulation and generate scenarios
-        sim_result = await run_simulation_tool(
-            {
-                "asset_system_id": asset_system_id,
-                "hazard_system_id": hazard_system_id,
-            }
+        sim_result = await run_simulation(
+            asset_system_id=asset_system_id,
+            hazard_system_id=hazard_system_id,
         )
         assert sim_result["success"] is True, sim_result
         simulation_id = sim_result["simulation_id"]
 
-        scenarios_result = await generate_scenarios_tool(
-            {"simulation_id": simulation_id, "num_samples": 2, "seed": 42}
+        scenarios_result = await generate_scenarios(
+            simulation_id=simulation_id, num_samples=2, seed=42
         )
         assert scenarios_result["success"] is True, scenarios_result
         scenario_name = next(iter(scenarios_result["scenarios"]))
 
         # Apply the first scenario to the system
         output_path = tmp_path / "updated_system.json"
-        result = await apply_scenario_to_system_tool(
-            {
-                "system_path": str(system_path),
-                "simulation_id": simulation_id,
-                "scenario_name": scenario_name,
-                "output_path": str(output_path),
-            }
+        result = await apply_scenario_to_system(
+            system_path=str(system_path),
+            simulation_id=simulation_id,
+            scenario_name=scenario_name,
+            output_path=str(output_path),
         )
 
         assert result["success"] is True, result
@@ -626,12 +615,10 @@ class TestApplyScenarioToSystem:
         system_path = tmp_path / "system.json"
         system_path.write_text("{}")
 
-        result = await apply_scenario_to_system_tool(
-            {
-                "system_path": str(system_path),
-                "simulation_id": "missing",
-                "output_path": str(tmp_path / "out.json"),
-            }
+        result = await apply_scenario_to_system(
+            system_path=str(system_path),
+            simulation_id="missing",
+            output_path=str(tmp_path / "out.json"),
         )
 
         assert "error" in result
@@ -655,30 +642,104 @@ class TestApplyScenarioToSystem:
         hazard_system_id = state.generate_id()
         state.hazard_systems[hazard_system_id] = hazard_system
 
-        sim_result = await run_simulation_tool(
-            {
-                "asset_system_id": asset_system_id,
-                "hazard_system_id": hazard_system_id,
-            }
+        sim_result = await run_simulation(
+            asset_system_id=asset_system_id,
+            hazard_system_id=hazard_system_id,
         )
         assert sim_result["success"] is True, sim_result
         simulation_id = sim_result["simulation_id"]
 
-        scenarios_result = await generate_scenarios_tool(
-            {"simulation_id": simulation_id, "num_samples": 2, "seed": 42}
+        scenarios_result = await generate_scenarios(
+            simulation_id=simulation_id, num_samples=2, seed=42
         )
         assert scenarios_result["success"] is True, scenarios_result
 
-        result = await apply_scenario_to_system_tool(
-            {
-                "system_path": str(system_path),
-                "simulation_id": simulation_id,
-                "scenario_name": "does_not_exist",
-                "output_path": str(tmp_path / "out.json"),
-            }
+        result = await apply_scenario_to_system(
+            system_path=str(system_path),
+            simulation_id=simulation_id,
+            scenario_name="does_not_exist",
+            output_path=str(tmp_path / "out.json"),
         )
 
         assert "error" in result
+
+
+class TestServerWiring:
+    """Test the MCPServer wiring from create_server()."""
+
+    @pytest.mark.asyncio
+    async def test_all_31_tools_registered(self):
+        """create_server() should register the full 31-tool surface."""
+        from erad.mcp.server import create_server
+
+        server = create_server()
+        tools = await server.list_tools()
+        tool_names = {tool.name for tool in tools}
+        assert len(tools) == 31
+        assert tool_names == {
+            "load_distribution_model",
+            "load_hazard_model",
+            "create_hazard_system",
+            "create_forefire_hazard",
+            "run_simulation",
+            "generate_scenarios",
+            "apply_scenario_to_system",
+            "query_assets",
+            "get_asset_details",
+            "get_asset_statistics",
+            "get_network_topology",
+            "list_historic_hurricanes",
+            "list_historic_earthquakes",
+            "list_historic_wildfires",
+            "load_historic_hurricane",
+            "load_historic_earthquake",
+            "load_historic_wildfire",
+            "list_fragility_curves",
+            "get_fragility_curve_parameters",
+            "export_to_sqlite",
+            "export_to_json",
+            "export_tracked_changes",
+            "export_parquet",
+            "export_csv",
+            "get_failed_assets",
+            "list_cached_models",
+            "get_cache_info",
+            "search_documentation",
+            "list_asset_types",
+            "list_loaded_systems",
+            "clear_system",
+        }
+
+    @pytest.mark.asyncio
+    async def test_resource_templates_and_catalog(self):
+        """Static catalog resource plus the three template resources are registered."""
+        from erad.mcp.server import create_server
+
+        server = create_server()
+        resources = await server.list_resources()
+        templates = await server.list_resource_templates()
+
+        # Static resources are listed individually; the catalog is the only static one.
+        assert {str(r.uri) for r in resources} == {"erad://catalog"}
+        # Templates are not expanded per-item.
+        assert {t.uri_template for t in templates} == {
+            "erad://docs/{doc_path}",
+            "erad://cached-model/{model_name}",
+            "erad://asset-system/{system_id}",
+        }
+
+    @pytest.mark.asyncio
+    async def test_prompts_registered(self):
+        """create_server() should register the three workflow prompts."""
+        from erad.mcp.server import create_server
+
+        server = create_server()
+        prompts = await server.list_prompts()
+        assert {p.name for p in prompts} == {
+            "run_resilience_study",
+            "explore_historic_hazard",
+            "analyze_asset_system",
+        }
 
 
 if __name__ == "__main__":

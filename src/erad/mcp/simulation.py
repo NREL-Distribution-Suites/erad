@@ -9,6 +9,7 @@ from dist_stack.manifest import write_manifest
 from dist_stack.registry import resolve_model_ref
 from loguru import logger
 from gdm.distribution import DistributionSystem
+from mcp.server import MCPServer
 
 from erad import __version__
 from erad.runner import HazardSimulator, HazardScenarioGenerator
@@ -25,12 +26,21 @@ def _resolve_model_ref_to_path(model_ref: dict) -> Path:
     return Path(resolve_model_ref(model_ref))
 
 
-async def load_distribution_model_tool(args: dict) -> dict:
-    """Load a distribution model from file or cache."""
-    source = args.get("source")
-    model_ref = args.get("model_ref")
-    from_cache = args.get("from_cache", False)
+async def load_distribution_model(
+    source: str | None = None,
+    model_ref: dict | None = None,
+    from_cache: bool = False,
+) -> dict:
+    """Load a distribution system model from file or cache. Returns a system ID for use in other tools.
 
+    Args:
+        source: File path or cached model name.
+        model_ref: Optional model reference ({model_id/version} or direct stored_path/path).
+        from_cache: Whether to load from cache (true) or file path (false).
+
+    Returns:
+        JSON payload with system_id, asset_count, and source on success, or an error payload.
+    """
     try:
         if from_cache:
             # Load from cache
@@ -82,23 +92,32 @@ async def load_distribution_model_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def load_hazard_model_tool(args: dict) -> dict:
-    """Load a hazard model from JSON file."""
-    model_ref = args.get("model_ref")
+async def load_hazard_model(
+    file_path: str | None = None,
+    model_ref: dict | None = None,
+) -> dict:
+    """Load a hazard system model from JSON file. Returns a system ID.
+
+    Args:
+        file_path: Path to hazard model JSON file.
+        model_ref: Optional model reference ({model_id/version} or direct stored_path/path).
+
+    Returns:
+        JSON payload with system_id, hazard_count, and source on success, or an error payload.
+    """
     if isinstance(model_ref, dict):
-        file_path = _resolve_model_ref_to_path(model_ref)
+        file_path_resolved = _resolve_model_ref_to_path(model_ref)
     else:
-        file_arg = args.get("file_path")
-        if not isinstance(file_arg, str) or not file_arg.strip():
+        if not isinstance(file_path, str) or not file_path.strip():
             return {"error": "Expected either file_path or model_ref"}
-        file_path = Path(file_arg)
+        file_path_resolved = Path(file_path)
 
     try:
-        if not file_path.exists():
-            return {"error": f"File not found: {file_path}"}
+        if not file_path_resolved.exists():
+            return {"error": f"File not found: {file_path_resolved}"}
 
-        logger.info(f"Loading hazard model from {file_path}")
-        hazard_system = HazardSystem.from_json(file_path)
+        logger.info(f"Loading hazard model from {file_path_resolved}")
+        hazard_system = HazardSystem.from_json(file_path_resolved)
 
         # Store in state
         system_id = state.generate_id()
@@ -115,7 +134,7 @@ async def load_hazard_model_tool(args: dict) -> dict:
             "success": True,
             "system_id": system_id,
             "hazard_count": hazard_count,
-            "source": str(file_path),
+            "source": str(file_path_resolved),
         }
 
     except Exception as e:
@@ -123,8 +142,12 @@ async def load_hazard_model_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def create_hazard_system_tool(args: dict) -> dict:
-    """Create a new empty hazard system."""
+async def create_hazard_system() -> dict:
+    """Create a new empty hazard system. Returns a system ID.
+
+    Returns:
+        JSON payload with the new system_id on success, or an error payload.
+    """
     try:
         hazard_system = HazardSystem()
         system_id = state.generate_id()
@@ -156,15 +179,23 @@ _FOREFIRE_DEFAULT_PARAMS = {
 }
 
 
-def _parse_forefire_args(args: dict) -> dict:
+def _parse_forefire_args(
+    landscape_path: str,
+    fuels_path: str,
+    ignition_lon: float | None,
+    ignition_lat: float | None,
+    ignition_time: str | None = None,
+    duration_seconds: int = 82800,
+    step_seconds: int = 10800,
+    domain_bbox: list | None = None,
+    wind_u: float = 0.0,
+    wind_v: float = 0.0,
+    extra_parameters: dict | None = None,
+) -> dict:
     """Validate and normalize arguments for the ForeFIRE hazard tool."""
-    from datetime import datetime as _dt
-
-    landscape_path = args.get("landscape_path")
-    fuels_path = args.get("fuels_path")
     if not landscape_path or not fuels_path:
         raise ValueError("landscape_path and fuels_path are required")
-    if "ignition_lon" not in args or "ignition_lat" not in args:
+    if ignition_lon is None or ignition_lat is None:
         raise ValueError("ignition_lon and ignition_lat are required")
 
     landscape = Path(landscape_path)
@@ -174,32 +205,30 @@ def _parse_forefire_args(args: dict) -> dict:
     if not fuels.exists():
         raise FileNotFoundError(f"Fuels file not found: {fuels}")
 
-    ignition_time_raw = args.get("ignition_time")
-    if ignition_time_raw:
-        ignition_time = _dt.fromisoformat(str(ignition_time_raw).replace("Z", "+00:00"))
+    if ignition_time:
+        ignition_time_dt = datetime.fromisoformat(str(ignition_time).replace("Z", "+00:00"))
     else:
-        ignition_time = _dt(2025, 1, 1, 0, 0, 0)
+        ignition_time_dt = datetime(2025, 1, 1, 0, 0, 0)
 
-    bbox = args.get("domain_bbox")
-    if bbox and len(bbox) == 4:
-        domain_bbox = tuple(float(v) for v in bbox)
+    if domain_bbox and len(domain_bbox) == 4:
+        domain_bbox_final = tuple(float(v) for v in domain_bbox)
     else:
-        lon = float(args["ignition_lon"])
-        lat = float(args["ignition_lat"])
-        domain_bbox = (lon - 0.5, lat - 0.5, lon + 0.5, lat + 0.5)
+        lon = float(ignition_lon)
+        lat = float(ignition_lat)
+        domain_bbox_final = (lon - 0.5, lat - 0.5, lon + 0.5, lat + 0.5)
 
     return {
         "landscape": landscape,
         "fuels": fuels,
-        "ignition_lon": float(args["ignition_lon"]),
-        "ignition_lat": float(args["ignition_lat"]),
-        "ignition_time": ignition_time,
-        "duration_seconds": int(args.get("duration_seconds", 82800)),
-        "step_seconds": int(args.get("step_seconds", 10800)),
-        "wind_u": float(args.get("wind_u", 0.0)),
-        "wind_v": float(args.get("wind_v", 0.0)),
-        "domain_bbox": domain_bbox,
-        "extra_parameters": args.get("extra_parameters") or dict(_FOREFIRE_DEFAULT_PARAMS),
+        "ignition_lon": float(ignition_lon),
+        "ignition_lat": float(ignition_lat),
+        "ignition_time": ignition_time_dt,
+        "duration_seconds": int(duration_seconds),
+        "step_seconds": int(step_seconds),
+        "wind_u": float(wind_u),
+        "wind_v": float(wind_v),
+        "domain_bbox": domain_bbox_final,
+        "extra_parameters": extra_parameters or dict(_FOREFIRE_DEFAULT_PARAMS),
     }
 
 
@@ -259,12 +288,40 @@ def _format_forefire_result(system_id: str, fire_models: list, config) -> dict:
     }
 
 
-async def create_forefire_hazard_tool(args: dict) -> dict:
-    """Build a wildfire hazard system from a ForeFIRE propagation simulation.
+async def create_forefire_hazard(
+    landscape_path: str,
+    fuels_path: str,
+    ignition_lon: float,
+    ignition_lat: float,
+    ignition_time: str | None = None,
+    duration_seconds: int = 82800,
+    step_seconds: int = 10800,
+    domain_bbox: list[float] | None = None,
+    wind_u: float = 0.0,
+    wind_v: float = 0.0,
+    extra_parameters: dict | None = None,
+) -> dict:
+    """Build a wildfire hazard system by running a ForeFIRE fire-spread simulation.
 
     Runs the erad-plugin-forefire physics simulation over a landscape NetCDF
     file, igniting a fire at the requested point, and registers the resulting
     time-stepped HazardSystem for use by run_simulation.
+
+    Args:
+        landscape_path: Path to the ForeFIRE landscape NetCDF file (fuel, altitude, wind).
+        fuels_path: Path to the fuels table CSV matching the landscape fuel indices.
+        ignition_lon: Ignition longitude (WGS84).
+        ignition_lat: Ignition latitude (WGS84).
+        ignition_time: ISO-8601 ignition time (default 2025-01-01T00:00:00).
+        duration_seconds: Total simulation duration in seconds (default 82800).
+        step_seconds: Perimeter extraction step in seconds (default 10800).
+        domain_bbox: Optional [west, south, east, north] bounds metadata.
+        wind_u: Optional constant eastward wind m/s (0 uses landscape wind).
+        wind_v: Optional constant northward wind m/s (0 uses landscape wind).
+        extra_parameters: Optional ForeFIRE setParameter overrides (propagation tuning).
+
+    Returns:
+        JSON payload with a hazard system ID and time-stepped fire perimeters.
     """
     try:
         try:
@@ -278,7 +335,19 @@ async def create_forefire_hazard_tool(args: dict) -> dict:
                 )
             }
 
-        parsed = _parse_forefire_args(args)
+        parsed = _parse_forefire_args(
+            landscape_path=landscape_path,
+            fuels_path=fuels_path,
+            ignition_lon=ignition_lon,
+            ignition_lat=ignition_lat,
+            ignition_time=ignition_time,
+            duration_seconds=duration_seconds,
+            step_seconds=step_seconds,
+            domain_bbox=domain_bbox,
+            wind_u=wind_u,
+            wind_v=wind_v,
+            extra_parameters=extra_parameters,
+        )
         config = ForefireConfig(
             landscape_path=parsed["landscape"],
             fuels_path=parsed["fuels"],
@@ -323,13 +392,23 @@ async def create_forefire_hazard_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def run_simulation_tool(args: dict) -> dict:
-    """Run a hazard simulation."""
-    asset_system_id = args["asset_system_id"]
-    hazard_system_id = args["hazard_system_id"]
-    curve_set = args.get("curve_set", "DEFAULT_CURVES")
-    output_path = args.get("output_path")
+async def run_simulation(
+    asset_system_id: str,
+    hazard_system_id: str,
+    curve_set: str = "DEFAULT_CURVES",
+    output_path: str | None = None,
+) -> dict:
+    """Run a hazard simulation using loaded asset and hazard systems.
 
+    Args:
+        asset_system_id: ID of loaded asset system.
+        hazard_system_id: ID of loaded hazard system.
+        curve_set: Fragility curve set name.
+        output_path: Output file path for the simulation artifact (a .manifest.json sidecar is written next to it).
+
+    Returns:
+        JSON payload with simulation_id and timestep information on success, or an error payload.
+    """
     try:
         # Validate systems exist
         if asset_system_id not in state.asset_systems:
@@ -406,12 +485,21 @@ async def run_simulation_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def generate_scenarios_tool(args: dict) -> dict:
-    """Generate Monte Carlo scenarios from simulation."""
-    simulation_id = args["simulation_id"]
-    num_samples = args.get("num_samples", 1)
-    seed = args.get("seed", 0)
+async def generate_scenarios(
+    simulation_id: str,
+    num_samples: int = 1,
+    seed: int = 0,
+) -> dict:
+    """Generate Monte Carlo failure scenarios from simulation results.
 
+    Args:
+        simulation_id: ID of completed simulation.
+        num_samples: Number of scenarios to generate.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        JSON payload with generated scenario summaries, or an error payload.
+    """
     try:
         if simulation_id not in state.simulation_results:
             return {"error": f"Simulation not found: {simulation_id}"}
@@ -462,18 +550,27 @@ async def generate_scenarios_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def apply_scenario_to_system_tool(args: dict) -> dict:
+async def apply_scenario_to_system(
+    system_path: str,
+    simulation_id: str,
+    output_path: str,
+    scenario_name: str | None = None,
+) -> dict:
     """Apply a Monte Carlo scenario's tracked changes to a distribution system.
 
     Loads the original DistributionSystem from ``system_path``, applies the
     tracked changes stored for ``simulation_id`` (optionally filtered to a single
     ``scenario_name``), and writes the updated system to ``output_path``.
-    """
-    system_path = args["system_path"]
-    simulation_id = args["simulation_id"]
-    scenario_name = args.get("scenario_name")
-    output_path = args["output_path"]
 
+    Args:
+        system_path: Path to the original DistributionSystem JSON file.
+        simulation_id: ID of simulation with tracked changes.
+        scenario_name: Optional scenario name to apply (e.g., 'sample_0').
+        output_path: Output file path for the updated system JSON.
+
+    Returns:
+        JSON payload with the output path and applied change count, or an error payload.
+    """
     try:
         from gdm.tracked_changes import (
             apply_updates_to_system,
@@ -523,3 +620,14 @@ async def apply_scenario_to_system_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error applying scenario to system: {e}")
         return {"error": str(e)}
+
+
+def register(mcp: MCPServer) -> None:
+    """Register simulation tools with the MCP server."""
+    mcp.tool()(load_distribution_model)
+    mcp.tool()(load_hazard_model)
+    mcp.tool()(create_hazard_system)
+    mcp.tool()(create_forefire_hazard)
+    mcp.tool()(run_simulation)
+    mcp.tool()(generate_scenarios)
+    mcp.tool()(apply_scenario_to_system)

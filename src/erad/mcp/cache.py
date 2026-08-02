@@ -5,14 +5,20 @@ Cache management tools for ERAD MCP Server.
 from pathlib import Path
 
 from loguru import logger
+from mcp.server import MCPServer
 
 from .helpers import get_cache_directory, get_hazard_cache_directory, load_metadata
 
 
-async def list_cached_models_tool(args: dict) -> dict:
-    """List cached models."""
-    model_type = args.get("model_type", "both")
+async def list_cached_models(model_type: str = "both") -> dict:
+    """List all cached distribution and hazard models.
 
+    Args:
+        model_type: 'distribution' or 'hazard' or 'both'.
+
+    Returns:
+        JSON payload with the cached model lists, or an error payload.
+    """
     try:
         result = {}
 
@@ -49,8 +55,12 @@ async def list_cached_models_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def get_cache_info_tool(args: dict) -> dict:
-    """Get cache information."""
+async def get_cache_info() -> dict:
+    """Get information about cache directories and usage.
+
+    Returns:
+        JSON payload with cache directory details, or an error payload.
+    """
     try:
         dist_cache_dir = get_cache_directory()
         hazard_cache_dir = get_hazard_cache_directory()
@@ -78,3 +88,9 @@ async def get_cache_info_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error getting cache info: {e}")
         return {"error": str(e)}
+
+
+def register(mcp: MCPServer) -> None:
+    """Register cache management tools with the MCP server."""
+    mcp.tool()(list_cached_models)
+    mcp.tool()(get_cache_info)

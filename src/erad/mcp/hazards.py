@@ -5,6 +5,7 @@ Historic hazard tools for ERAD MCP Server.
 import sqlite3
 
 from loguru import logger
+from mcp.server import MCPServer
 
 from erad.models.hazard.wind import WindModel
 from erad.models.hazard.earthquake import EarthQuakeModel
@@ -14,11 +15,16 @@ from .state import state
 from .helpers import get_historic_hazard_db
 
 
-async def list_historic_hurricanes_tool(args: dict) -> dict:
-    """List historic hurricanes from database."""
-    year = args.get("year")
-    limit = args.get("limit", 50)
+async def list_historic_hurricanes(year: int | None = None, limit: int = 50) -> dict:
+    """List available historic hurricanes from the database.
 
+    Args:
+        year: Filter by year (optional).
+        limit: Maximum number of results.
+
+    Returns:
+        JSON payload with the hurricane list, or an error payload.
+    """
     try:
         db_path = get_historic_hazard_db()
         if not db_path.exists():
@@ -77,11 +83,16 @@ async def list_historic_hurricanes_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def list_historic_earthquakes_tool(args: dict) -> dict:
-    """List historic earthquakes from database."""
-    min_magnitude = args.get("min_magnitude")
-    limit = args.get("limit", 50)
+async def list_historic_earthquakes(min_magnitude: float | None = None, limit: int = 50) -> dict:
+    """List available historic earthquakes from the database.
 
+    Args:
+        min_magnitude: Minimum magnitude filter (optional).
+        limit: Maximum number of results.
+
+    Returns:
+        JSON payload with the earthquake list, or an error payload.
+    """
     try:
         db_path = get_historic_hazard_db()
         if not db_path.exists():
@@ -124,11 +135,16 @@ async def list_historic_earthquakes_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def list_historic_wildfires_tool(args: dict) -> dict:
-    """List historic wildfires from database."""
-    year = args.get("year")
-    limit = args.get("limit", 50)
+async def list_historic_wildfires(year: int | None = None, limit: int = 50) -> dict:
+    """List available historic wildfires from the database.
 
+    Args:
+        year: Filter by year (optional).
+        limit: Maximum number of results.
+
+    Returns:
+        JSON payload with the wildfire list, or an error payload.
+    """
     try:
         db_path = get_historic_hazard_db()
         if not db_path.exists():
@@ -162,11 +178,16 @@ async def list_historic_wildfires_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def load_historic_hurricane_tool(args: dict) -> dict:
-    """Load historic hurricane into hazard system."""
-    hazard_system_id = args["hazard_system_id"]
-    hurricane_sid = args["hurricane_sid"]
+async def load_historic_hurricane(hazard_system_id: str, hurricane_sid: str) -> dict:
+    """Load a historic hurricane and add to hazard system.
 
+    Args:
+        hazard_system_id: ID of hazard system to add to.
+        hurricane_sid: Hurricane SID (e.g., '2017228N14314').
+
+    Returns:
+        JSON payload with the loaded track points, or an error payload.
+    """
     try:
         if hazard_system_id not in state.hazard_systems:
             return {"error": f"Hazard system not found: {hazard_system_id}"}
@@ -197,11 +218,16 @@ async def load_historic_hurricane_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def load_historic_earthquake_tool(args: dict) -> dict:
-    """Load historic earthquake into hazard system."""
-    hazard_system_id = args["hazard_system_id"]
-    earthquake_code = args["earthquake_code"]
+async def load_historic_earthquake(hazard_system_id: str, earthquake_code: str) -> dict:
+    """Load a historic earthquake and add to hazard system.
 
+    Args:
+        hazard_system_id: ID of hazard system to add to.
+        earthquake_code: Earthquake code (e.g., 'ISCGEM851547').
+
+    Returns:
+        JSON payload with the loaded earthquake, or an error payload.
+    """
     try:
         if hazard_system_id not in state.hazard_systems:
             return {"error": f"Hazard system not found: {hazard_system_id}"}
@@ -225,11 +251,16 @@ async def load_historic_earthquake_tool(args: dict) -> dict:
         return {"error": str(e)}
 
 
-async def load_historic_wildfire_tool(args: dict) -> dict:
-    """Load historic wildfire into hazard system."""
-    hazard_system_id = args["hazard_system_id"]
-    wildfire_name = args["wildfire_name"]
+async def load_historic_wildfire(hazard_system_id: str, wildfire_name: str) -> dict:
+    """Load a historic wildfire and add to hazard system.
 
+    Args:
+        hazard_system_id: ID of hazard system to add to.
+        wildfire_name: Wildfire name (e.g., 'GREAT LAKES FIRE').
+
+    Returns:
+        JSON payload with the loaded wildfire, or an error payload.
+    """
     try:
         if hazard_system_id not in state.hazard_systems:
             return {"error": f"Hazard system not found: {hazard_system_id}"}
@@ -250,3 +281,13 @@ async def load_historic_wildfire_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error loading wildfire: {e}")
         return {"error": str(e)}
+
+
+def register(mcp: MCPServer) -> None:
+    """Register historic hazard tools with the MCP server."""
+    mcp.tool()(list_historic_hurricanes)
+    mcp.tool()(list_historic_earthquakes)
+    mcp.tool()(list_historic_wildfires)
+    mcp.tool()(load_historic_hurricane)
+    mcp.tool()(load_historic_earthquake)
+    mcp.tool()(load_historic_wildfire)
