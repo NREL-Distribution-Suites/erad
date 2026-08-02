@@ -12,4 +12,22 @@ from erad.default_fragility_curves.default_flood_velocity import (
 )
 from erad.default_fragility_curves.default_flood_depth import DEFAULT_FLOOD_DEPTH_FRAGILITY_CURVES
 from erad.default_fragility_curves.default_wind_speed import DEFAULT_WIND_SPEED_FRAGILITY_CURVES
-from erad.default_fragility_curves.default_fragility_curves import DEFAULT_FRAGILTY_CURVES
+from erad.default_fragility_curves.default_fragility_curves import DEFAULT_FRAGILITY_CURVES
+
+
+def __getattr__(name: str):
+    """Resolve deprecated names at package level.
+
+    ``DEFAULT_FRAGILTY_CURVES`` (misspelled) is deprecated in favor of
+    ``DEFAULT_FRAGILITY_CURVES``; accessing it emits a ``DeprecationWarning``.
+    """
+    if name == "DEFAULT_FRAGILTY_CURVES":
+        import warnings
+
+        warnings.warn(
+            "DEFAULT_FRAGILTY_CURVES is deprecated; use DEFAULT_FRAGILITY_CURVES instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return DEFAULT_FRAGILITY_CURVES
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

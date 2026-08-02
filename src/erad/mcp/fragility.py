@@ -4,7 +4,7 @@ Fragility curve tools for ERAD MCP Server.
 
 from loguru import logger
 
-from erad.default_fragility_curves import DEFAULT_FRAGILTY_CURVES
+from erad.default_fragility_curves import DEFAULT_FRAGILITY_CURVES
 
 
 async def list_fragility_curves_tool(args: dict) -> dict:
@@ -12,7 +12,7 @@ async def list_fragility_curves_tool(args: dict) -> dict:
     try:
         # Get default curve sets
         curve_info = {}
-        for curve_set in DEFAULT_FRAGILTY_CURVES:
+        for curve_set in DEFAULT_FRAGILITY_CURVES:
             hazard_param = curve_set.asset_state_param
             if hazard_param not in curve_info:
                 curve_info[hazard_param] = {"asset_types": [], "curve_count": 0}
@@ -43,7 +43,7 @@ async def get_fragility_curve_parameters_tool(args: dict) -> dict:
         # Find matching curves
         matching_curves = []
 
-        for curve_set in DEFAULT_FRAGILTY_CURVES:
+        for curve_set in DEFAULT_FRAGILITY_CURVES:
             if curve_set.asset_state_param == hazard_type:
                 for curve in curve_set.curves:
                     curve_asset_type = (

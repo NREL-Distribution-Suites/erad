@@ -11,7 +11,7 @@ from gdm.tracked_changes import (
     PropertyEdit,
 )
 
-from erad.default_fragility_curves import DEFAULT_FRAGILTY_CURVES
+from erad.default_fragility_curves import DEFAULT_FRAGILITY_CURVES
 from erad.models.fragility_curve import HazardFragilityCurves
 from erad.systems.hazard_system import HazardSystem
 from erad.systems.asset_system import AssetSystem
@@ -65,7 +65,7 @@ class HazardSimulator:
             logger.warning(
                 "No HazardFragilityCurves definitions found in the passed HazardSystem, using default curve definitions"
             )
-            probability_models = DEFAULT_FRAGILTY_CURVES
+            probability_models = DEFAULT_FRAGILITY_CURVES
 
         self.hazard_system = hazard_system
         self.timestamps = self._get_time_stamps()

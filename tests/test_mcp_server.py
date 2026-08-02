@@ -4,6 +4,7 @@ Tests for ERAD MCP Server
 
 import os
 from datetime import datetime
+from pathlib import Path
 import pytest
 import sqlite3
 from unittest.mock import Mock
@@ -124,6 +125,30 @@ class TestSimulationTools:
             os.environ.pop("DIST_STACK_MODEL_REGISTRY_DB", None)
 
         assert str(path) == str(tmp_path / "erad_v3.json")
+
+    def test_resolve_model_ref_library_registered(self, tmp_path):
+        """Register via the dist-stack library, then resolve via model_id/version."""
+        from dist_stack.registry import register
+
+        db_path = tmp_path / "registry.sqlite"
+        model_file = tmp_path / "registered_v2.json"
+        model_file.write_text("{}")
+
+        os.environ["DIST_STACK_MODEL_REGISTRY_DB"] = str(db_path)
+        try:
+            register(
+                model_id="erad-lib",
+                version=2,
+                stored_path=model_file,
+                metadata={"tool": "test"},
+            )
+            path = _resolve_model_ref_to_path({"model_id": "erad-lib", "version": 2})
+        finally:
+            os.environ.pop("DIST_STACK_MODEL_REGISTRY_DB", None)
+
+        assert isinstance(path, Path)
+        assert str(path) == str(model_file)
+        assert path.exists()
 
 
 class TestAssetQueryTools:

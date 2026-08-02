@@ -3,7 +3,7 @@ from infrasys import System
 from gdm.distribution.enums import PlotingStyle, MapType
 import plotly.graph_objects as go
 
-from erad.default_fragility_curves import DEFAULT_FRAGILTY_CURVES
+from erad.default_fragility_curves import DEFAULT_FRAGILITY_CURVES
 from erad.constants import HAZARD_MODELS
 import erad.models.fragility_curve as fc
 import erad.models.hazard as hz
@@ -30,7 +30,7 @@ class HazardSystem(System):
 
     def to_json(self, filename, overwrite=False, indent=None, data=None):
         if not list(self.get_components(fc.HazardFragilityCurves)):
-            self.add_components(*DEFAULT_FRAGILTY_CURVES)
+            self.add_components(*DEFAULT_FRAGILITY_CURVES)
         return super().to_json(filename, overwrite, indent, data)
 
     @classmethod

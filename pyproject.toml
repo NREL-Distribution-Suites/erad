@@ -42,6 +42,7 @@ classifiers = [
 dependencies = [
     "grid-data-models==2.3.7",
     "gdmloader",
+    "dist-stack-model-registry>=0.1,<1",
     "geopandas",
     "requests",
     "elevation",

@@ -3,10 +3,9 @@ Simulation tools for ERAD MCP Server.
 """
 
 from datetime import datetime
-import os
 from pathlib import Path
-import sqlite3
 
+from dist_stack.registry import resolve_model_ref
 from loguru import logger
 from gdm.distribution import DistributionSystem
 
@@ -21,50 +20,7 @@ from .helpers import get_cache_directory, load_metadata
 
 def _resolve_model_ref_to_path(model_ref: dict) -> Path:
     """Resolve model_ref payload into a local file path."""
-    for key in ("stored_path", "path", "source_path"):
-        value = model_ref.get(key)
-        if isinstance(value, str) and value.strip():
-            return Path(value)
-
-    model_id = model_ref.get("model_id")
-    if not isinstance(model_id, str) or not model_id.strip():
-        raise ValueError("model_ref must include a path or model_id")
-
-    version = model_ref.get("version")
-    db_path = model_ref.get("registry_db") or os.getenv("DIST_STACK_MODEL_REGISTRY_DB")
-    if not db_path:
-        raise ValueError(
-            "model_ref requires DIST_STACK_MODEL_REGISTRY_DB (or model_ref.registry_db) "
-            "when path fields are not provided"
-        )
-
-    with sqlite3.connect(str(db_path)) as conn:
-        conn.row_factory = sqlite3.Row
-        if version is None:
-            row = conn.execute(
-                """
-                SELECT stored_path FROM models
-                WHERE model_id = ?
-                ORDER BY version DESC
-                LIMIT 1
-                """,
-                (model_id,),
-            ).fetchone()
-        else:
-            row = conn.execute(
-                """
-                SELECT stored_path FROM models
-                WHERE model_id = ? AND version = ?
-                LIMIT 1
-                """,
-                (model_id, int(version)),
-            ).fetchone()
-
-    if row is None:
-        suffix = "latest" if version is None else f"version={version}"
-        raise ValueError(f"model_ref not found for model_id={model_id}, {suffix}")
-
-    return Path(str(row["stored_path"]))
+    return Path(resolve_model_ref(model_ref))
 
 
 async def load_distribution_model_tool(args: dict) -> dict:

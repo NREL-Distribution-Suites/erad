@@ -2,7 +2,7 @@ from pydantic import ValidationError
 from infrasys import BaseQuantity
 
 from erad.models.fragility_curve import HazardFragilityCurves, FragilityCurve, ProbabilityFunction
-from erad.default_fragility_curves import DEFAULT_FRAGILTY_CURVES
+from erad.default_fragility_curves import DEFAULT_FRAGILITY_CURVES
 from erad.quantities import Speed
 from erad.enums import AssetTypes
 
@@ -38,7 +38,7 @@ def test_invalid_hazard_fragility_model():
         )
 
 
-@pytest.mark.parametrize("hazard_curve_set", DEFAULT_FRAGILTY_CURVES)
+@pytest.mark.parametrize("hazard_curve_set", DEFAULT_FRAGILITY_CURVES)
 def test_default_hazard_curves(hazard_curve_set: HazardFragilityCurves):
     for curve in hazard_curve_set.curves:
         prob = curve.prob_function
