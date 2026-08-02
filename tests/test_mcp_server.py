@@ -664,6 +664,28 @@ class TestApplyScenarioToSystem:
         assert "error" in result
 
 
+class TestConsoleEntryPoint:
+    """The ``erad-mcp`` console entry point (``erad.mcp:main`` -> ``serve``)."""
+
+    def test_main_and_serve_are_plain_sync_callables(self):
+        """``main()``/``serve()`` must be plain sync functions.
+
+        mcp 2.x ``MCPServer.run()`` starts its own anyio/asyncio loop, so the
+        entry point must NOT wrap it in ``asyncio.run()`` (that nests a second
+        loop and crashes with ``RuntimeError: Already running asyncio in this
+        thread``). This pins the regression that was worked around in the
+        gdm-stack MCP wiring.
+        """
+        import inspect
+
+        from erad.mcp import main, serve
+
+        assert callable(main)
+        assert callable(serve)
+        assert not inspect.iscoroutinefunction(main)
+        assert not inspect.iscoroutinefunction(serve)
+
+
 class TestServerWiring:
     """Test the MCPServer wiring from create_server()."""
 

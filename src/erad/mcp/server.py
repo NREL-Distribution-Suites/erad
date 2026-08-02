@@ -2,7 +2,6 @@
 Main ERAD MCP Server - Tool registration and server setup.
 """
 
-import asyncio
 import sys
 
 from loguru import logger
@@ -55,8 +54,14 @@ def create_server() -> MCPServer:
     return mcp
 
 
-async def serve():
-    """Run the MCP server."""
+def serve():
+    """Run the MCP server.
+
+    ``MCPServer.run()`` (mcp 2.x) is synchronous and starts its own event loop,
+    so it must not be wrapped in ``asyncio.run()`` -- doing so nests a second
+    anyio/asyncio loop and crashes with ``RuntimeError: Already running asyncio
+    in this thread``.
+    """
     logger.info("Starting ERAD MCP Server")
     create_server().run(transport="stdio")
 
@@ -71,4 +76,4 @@ def main():
         level="INFO",
     )
 
-    asyncio.run(serve())
+    serve()
