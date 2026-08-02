@@ -5,17 +5,19 @@ Simulation tools for ERAD MCP Server.
 from datetime import datetime
 from pathlib import Path
 
+from dist_stack.manifest import write_manifest
 from dist_stack.registry import resolve_model_ref
 from loguru import logger
 from gdm.distribution import DistributionSystem
 
+from erad import __version__
 from erad.runner import HazardSimulator, HazardScenarioGenerator
 from erad.systems.asset_system import AssetSystem
 from erad.systems.hazard_system import HazardSystem
 from erad.constants import HAZARD_TYPES
 
 from .state import state
-from .helpers import get_cache_directory, load_metadata
+from .helpers import get_cache_directory, get_hazard_cache_directory, load_metadata
 
 
 def _resolve_model_ref_to_path(model_ref: dict) -> Path:
@@ -326,6 +328,7 @@ async def run_simulation_tool(args: dict) -> dict:
     asset_system_id = args["asset_system_id"]
     hazard_system_id = args["hazard_system_id"]
     curve_set = args.get("curve_set", "DEFAULT_CURVES")
+    output_path = args.get("output_path")
 
     try:
         # Validate systems exist
@@ -358,8 +361,35 @@ async def run_simulation_tool(args: dict) -> dict:
             "timestamps": [ts.isoformat() for ts in simulator.timestamps],
         }
 
+        # Persist the simulation output artifact and write a provenance manifest
+        # sidecar alongside it.
+        if not output_path:
+            output_path = get_hazard_cache_directory() / f"simulation_{simulation_id}.json"
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        hazard_system.to_json(output_path)
+
+        hazard_types = [
+            hazard_type.__name__
+            for hazard_type in HAZARD_TYPES
+            if any(True for _ in hazard_system.get_components(hazard_type))
+        ]
+        write_manifest(
+            output_path,
+            artifact_type="erad_simulation",
+            tool="run_simulation",
+            tool_version=__version__,
+            package="erad",
+            package_version=__version__,
+            config={
+                "hazard_type": ",".join(hazard_types) if hazard_types else "unknown",
+                "scenario_count": 1,
+            },
+        )
+
         logger.info(
-            f"Simulation {simulation_id} completed with {len(simulator.timestamps)} timesteps"
+            f"Simulation {simulation_id} completed with {len(simulator.timestamps)} timesteps; "
+            f"wrote manifest sidecar for {output_path}"
         )
 
         return {
@@ -368,6 +398,7 @@ async def run_simulation_tool(args: dict) -> dict:
             "asset_count": len(simulator.assets),
             "timesteps": len(simulator.timestamps),
             "timestamps": [ts.isoformat() for ts in simulator.timestamps],
+            "output_path": str(output_path),
         }
 
     except Exception as e:

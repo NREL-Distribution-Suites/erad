@@ -215,6 +215,10 @@ def _get_tools() -> list[Tool]:
                         "description": "Fragility curve set name",
                         "default": "DEFAULT_CURVES",
                     },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output file path for the simulation artifact (a .manifest.json sidecar is written next to it)",
+                    },
                 },
                 "required": ["asset_system_id", "hazard_system_id"],
             },

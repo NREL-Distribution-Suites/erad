@@ -335,5 +335,55 @@ class TestErrorHandling:
         assert "not found" in result["error"].lower()
 
 
+class TestProvenanceManifest:
+    """Provenance manifest sidecar wiring for simulation artifacts."""
+
+    @pytest.mark.asyncio
+    async def test_run_simulation_writes_manifest(self, clean_state, tmp_path):
+        """A completed simulation should write a .manifest.json sidecar next to its output artifact."""
+        from dist_stack.manifest import get_manifest_path, has_manifest, read_manifest
+        from erad.models.asset import Asset
+        from erad.systems.asset_system import AssetSystem
+        from erad.systems.hazard_system import HazardSystem
+
+        # Build a minimal asset system + hazard system in server state
+        asset_system = AssetSystem(auto_add_composed_components=True)
+        asset_system.add_component(Asset.example())
+        asset_system_id = state.generate_id()
+        state.asset_systems[asset_system_id] = asset_system
+
+        hazard_system = HazardSystem.wind_example()
+        hazard_system_id = state.generate_id()
+        state.hazard_systems[hazard_system_id] = hazard_system
+
+        output_path = tmp_path / "simulation.json"
+        result = await run_simulation_tool(
+            {
+                "asset_system_id": asset_system_id,
+                "hazard_system_id": hazard_system_id,
+                "output_path": str(output_path),
+            }
+        )
+
+        assert result["success"] is True
+        assert result["output_path"] == str(output_path)
+
+        # The output artifact itself should exist...
+        assert output_path.exists()
+        # ...with a provenance manifest sidecar next to it
+        assert get_manifest_path(output_path) == tmp_path / "simulation.json.manifest.json"
+        assert has_manifest(output_path)
+        assert (tmp_path / "simulation.json.manifest.json").exists()
+
+        manifest = read_manifest(output_path)
+        assert manifest.artifact_type == "erad_simulation"
+        assert manifest.tool == "run_simulation"
+        assert manifest.package == "erad"
+        assert manifest.package_version == "0.1.14"
+        assert "hazard_type" in manifest.config
+        assert manifest.config["hazard_type"] == "WindModel"
+        assert manifest.config["scenario_count"] == 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
