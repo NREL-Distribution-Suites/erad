@@ -115,3 +115,91 @@ async def export_tracked_changes_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error exporting tracked changes: {e}")
         return {"error": str(e)}
+
+
+def _get_engine(simulation_id: str):
+    """Return the DuckDB SimulationEngine for a simulation, or raise if unavailable."""
+    if simulation_id not in state.hazard_simulators:
+        raise ValueError(f"Simulation not found: {simulation_id}")
+    engine = state.hazard_simulators[simulation_id].engine
+    if engine is None:
+        raise ValueError("Simulation has no DuckDB engine available")
+    return engine
+
+
+async def export_parquet_tool(args: dict) -> dict:
+    """Export simulation results to Parquet format."""
+    simulation_id = args["simulation_id"]
+    output_path = args["output_path"]
+
+    try:
+        engine = _get_engine(simulation_id)
+
+        logger.info(f"Exporting simulation {simulation_id} to Parquet: {output_path}")
+        engine.export_to_parquet(output_path)
+
+        return {
+            "success": True,
+            "output_path": output_path,
+            "message": f"Simulation results exported to Parquet at {output_path}",
+        }
+
+    except Exception as e:
+        logger.error(f"Error exporting simulation to Parquet: {e}")
+        return {"error": str(e)}
+
+
+async def export_csv_tool(args: dict) -> dict:
+    """Export simulation results to CSV format."""
+    simulation_id = args["simulation_id"]
+    output_path = args["output_path"]
+
+    try:
+        engine = _get_engine(simulation_id)
+
+        logger.info(f"Exporting simulation {simulation_id} to CSV: {output_path}")
+        engine.export_to_csv(output_path)
+
+        return {
+            "success": True,
+            "output_path": output_path,
+            "message": f"Simulation results exported to CSV at {output_path}",
+        }
+
+    except Exception as e:
+        logger.error(f"Error exporting simulation to CSV: {e}")
+        return {"error": str(e)}
+
+
+async def get_failed_assets_tool(args: dict) -> dict:
+    """Get assets with survival probability below a threshold."""
+    simulation_id = args["simulation_id"]
+    threshold = args.get("threshold", 0.5)
+
+    try:
+        engine = _get_engine(simulation_id)
+
+        logger.info(
+            f"Getting failed assets for simulation {simulation_id} (threshold={threshold})"
+        )
+        df = engine.get_failed_assets(threshold)
+
+        # Convert to JSON-serializable records (timestamps -> ISO strings)
+        failed_assets = []
+        for record in df.to_dict(orient="records"):
+            serializable = dict(record)
+            timestamp = serializable.get("timestamp")
+            if hasattr(timestamp, "isoformat"):
+                serializable["timestamp"] = timestamp.isoformat()
+            failed_assets.append(serializable)
+
+        return {
+            "success": True,
+            "failed_asset_count": len(failed_assets),
+            "failed_assets": failed_assets,
+            "threshold": threshold,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting failed assets: {e}")
+        return {"error": str(e)}

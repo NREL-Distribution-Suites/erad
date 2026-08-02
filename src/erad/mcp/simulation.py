@@ -460,3 +460,66 @@ async def generate_scenarios_tool(args: dict) -> dict:
     except Exception as e:
         logger.error(f"Error generating scenarios: {e}")
         return {"error": str(e)}
+
+
+async def apply_scenario_to_system_tool(args: dict) -> dict:
+    """Apply a Monte Carlo scenario's tracked changes to a distribution system.
+
+    Loads the original DistributionSystem from ``system_path``, applies the
+    tracked changes stored for ``simulation_id`` (optionally filtered to a single
+    ``scenario_name``), and writes the updated system to ``output_path``.
+    """
+    system_path = args["system_path"]
+    simulation_id = args["simulation_id"]
+    scenario_name = args.get("scenario_name")
+    output_path = args["output_path"]
+
+    try:
+        from gdm.tracked_changes import (
+            apply_updates_to_system,
+            filter_tracked_changes_by_name_and_date,
+        )
+
+        if simulation_id not in state.simulation_results:
+            return {"error": f"Simulation not found: {simulation_id}"}
+
+        sim_info = state.simulation_results[simulation_id]
+        if "tracked_changes" not in sim_info:
+            return {"error": "No tracked changes found. Run generate_scenarios first."}
+
+        tracked_changes = sim_info["tracked_changes"]
+
+        if scenario_name:
+            tracked_changes = filter_tracked_changes_by_name_and_date(
+                tracked_changes=tracked_changes, scenario_name=scenario_name
+            )
+            if not tracked_changes:
+                return {"error": f"No tracked changes found for scenario '{scenario_name}'"}
+
+        if not Path(system_path).exists():
+            return {"error": f"System file not found: {system_path}"}
+
+        logger.info(
+            f"Loading distribution system from {system_path} and applying "
+            f"{len(tracked_changes)} tracked changes"
+        )
+        system = DistributionSystem.from_json(system_path)
+        updated_system = apply_updates_to_system(tracked_changes, system, catalog=None)
+
+        updated_system.to_json(output_path)
+
+        logger.info(
+            f"Applied {len(tracked_changes)} tracked changes and wrote result to {output_path}"
+        )
+
+        return {
+            "success": True,
+            "output_path": output_path,
+            "applied_change_count": len(tracked_changes),
+            "scenario_name": scenario_name,
+            "message": f"Scenario applied to system and written to {output_path}",
+        }
+
+    except Exception as e:
+        logger.error(f"Error applying scenario to system: {e}")
+        return {"error": str(e)}

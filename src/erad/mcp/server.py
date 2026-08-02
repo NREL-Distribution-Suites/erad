@@ -30,6 +30,7 @@ from .simulation import (
     create_forefire_hazard_tool,
     run_simulation_tool,
     generate_scenarios_tool,
+    apply_scenario_to_system_tool,
 )
 from .assets import (
     query_assets_tool,
@@ -53,6 +54,9 @@ from .export import (
     export_to_sqlite_tool,
     export_to_json_tool,
     export_tracked_changes_tool,
+    export_parquet_tool,
+    export_csv_tool,
+    get_failed_assets_tool,
 )
 from .cache import (
     list_cached_models_tool,
@@ -507,6 +511,90 @@ def _get_tools() -> list[Tool]:
                 "required": ["simulation_id", "output_path"],
             },
         ),
+        Tool(
+            name="export_parquet",
+            description="Export simulation results to Parquet format.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "simulation_id": {
+                        "type": "string",
+                        "description": "ID of completed simulation",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output file path for the Parquet file",
+                    },
+                },
+                "required": ["simulation_id", "output_path"],
+            },
+        ),
+        Tool(
+            name="export_csv",
+            description="Export simulation results to CSV format.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "simulation_id": {
+                        "type": "string",
+                        "description": "ID of completed simulation",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output file path for the CSV file",
+                    },
+                },
+                "required": ["simulation_id", "output_path"],
+            },
+        ),
+        Tool(
+            name="get_failed_assets",
+            description="Get assets with survival probability below a threshold from a simulation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "simulation_id": {
+                        "type": "string",
+                        "description": "ID of completed simulation",
+                    },
+                    "threshold": {
+                        "type": "number",
+                        "description": "Survival probability threshold (default 0.5)",
+                        "default": 0.5,
+                    },
+                },
+                "required": ["simulation_id"],
+            },
+        ),
+        Tool(
+            name="apply_scenario_to_system",
+            description=(
+                "Apply a Monte Carlo scenario's tracked changes to a distribution system "
+                "JSON file and save the updated system. Run generate_scenarios first."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "system_path": {
+                        "type": "string",
+                        "description": "Path to the original DistributionSystem JSON file",
+                    },
+                    "simulation_id": {
+                        "type": "string",
+                        "description": "ID of simulation with tracked changes",
+                    },
+                    "scenario_name": {
+                        "type": "string",
+                        "description": "Optional scenario name to apply (e.g., 'sample_0')",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output file path for the updated system JSON",
+                    },
+                },
+                "required": ["system_path", "simulation_id", "output_path"],
+            },
+        ),
         # Cache Management
         Tool(
             name="list_cached_models",
@@ -574,6 +662,7 @@ _TOOL_HANDLERS = {
     "create_forefire_hazard": create_forefire_hazard_tool,
     "run_simulation": run_simulation_tool,
     "generate_scenarios": generate_scenarios_tool,
+    "apply_scenario_to_system": apply_scenario_to_system_tool,
     "query_assets": query_assets_tool,
     "get_asset_details": get_asset_details_tool,
     "get_asset_statistics": get_asset_statistics_tool,
@@ -589,6 +678,9 @@ _TOOL_HANDLERS = {
     "export_to_sqlite": export_to_sqlite_tool,
     "export_to_json": export_to_json_tool,
     "export_tracked_changes": export_tracked_changes_tool,
+    "export_parquet": export_parquet_tool,
+    "export_csv": export_csv_tool,
+    "get_failed_assets": get_failed_assets_tool,
     "list_cached_models": list_cached_models_tool,
     "get_cache_info": get_cache_info_tool,
     "search_documentation": search_documentation_tool,

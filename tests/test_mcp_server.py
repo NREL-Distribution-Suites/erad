@@ -15,6 +15,13 @@ from erad.mcp.simulation import (
     create_hazard_system_tool,
     _resolve_model_ref_to_path,
     run_simulation_tool,
+    generate_scenarios_tool,
+    apply_scenario_to_system_tool,
+)
+from erad.mcp.export import (
+    export_csv_tool,
+    export_parquet_tool,
+    get_failed_assets_tool,
 )
 from erad.mcp.assets import (
     query_assets_tool,
@@ -383,6 +390,295 @@ class TestProvenanceManifest:
         assert "hazard_type" in manifest.config
         assert manifest.config["hazard_type"] == "WindModel"
         assert manifest.config["scenario_count"] == 1
+
+
+async def _run_failure_simulation():
+    """Set up asset/hazard systems in state and run a simulation where an asset fails.
+
+    Builds a single distribution pole placed 50 miles from a 150 mph hurricane
+    eye (the radius of maximum wind), so its survival probability drops well
+    below the 0.5 default threshold. Returns the simulation_id.
+    """
+    from datetime import datetime
+    from uuid import UUID
+
+    from geopy.distance import distance as geodist
+    from infrasys.quantities import Distance
+    from shapely.geometry import Point
+
+    from erad.models.asset import Asset, AssetState, AssetTypes
+    from erad.models.hazard.wind import WindModel
+    from erad.quantities import Pressure, Speed
+    from erad.systems.asset_system import AssetSystem
+    from erad.systems.hazard_system import HazardSystem
+
+    center = Point(-121.93036, 36.60144)
+    asset_point = geodist(miles=50).destination((36.60144, -121.93036), bearing=0)
+
+    asset_system = AssetSystem(auto_add_composed_components=True)
+    asset_system.add_component(
+        Asset(
+            name="Asset 1",
+            asset_type=AssetTypes.distribution_poles,
+            distribution_asset=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            height=Distance(100, "m"),
+            latitude=asset_point.latitude,
+            longitude=asset_point.longitude,
+            asset_state=[AssetState(timestamp=datetime.now())],
+        )
+    )
+    asset_system_id = state.generate_id()
+    state.asset_systems[asset_system_id] = asset_system
+
+    hazard_system = HazardSystem(auto_add_composed_components=True)
+    hazard_system.add_component(
+        WindModel(
+            name="hurricane 1",
+            timestamp=datetime.now(),
+            center=center,
+            max_wind_speed=Speed(150, "miles/hour"),
+            air_pressure=Pressure(1013.25, "hPa"),
+            radius_of_max_wind=Distance(50, "miles"),
+            radius_of_closest_isobar=Distance(300, "miles"),
+        )
+    )
+    hazard_system_id = state.generate_id()
+    state.hazard_systems[hazard_system_id] = hazard_system
+
+    result = await run_simulation_tool(
+        {
+            "asset_system_id": asset_system_id,
+            "hazard_system_id": hazard_system_id,
+        }
+    )
+    assert result["success"] is True, result
+    return result["simulation_id"]
+
+
+class TestEngineExportTools:
+    """Test DuckDB engine export tools."""
+
+    @pytest.mark.asyncio
+    async def test_export_parquet(self, clean_state, tmp_path):
+        """Exporting a completed simulation should write a Parquet file."""
+        simulation_id = await _run_failure_simulation()
+        output_path = tmp_path / "results.parquet"
+
+        result = await export_parquet_tool(
+            {"simulation_id": simulation_id, "output_path": str(output_path)}
+        )
+
+        assert result["success"] is True
+        assert result["output_path"] == str(output_path)
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
+
+    @pytest.mark.asyncio
+    async def test_export_csv(self, clean_state, tmp_path):
+        """Exporting a completed simulation should write a CSV file."""
+        simulation_id = await _run_failure_simulation()
+        output_path = tmp_path / "results.csv"
+
+        result = await export_csv_tool(
+            {"simulation_id": simulation_id, "output_path": str(output_path)}
+        )
+
+        assert result["success"] is True
+        assert result["output_path"] == str(output_path)
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
+
+    @pytest.mark.asyncio
+    async def test_export_parquet_missing_simulation(self, clean_state, tmp_path):
+        """Exporting with an unknown simulation should return an error."""
+        result = await export_parquet_tool(
+            {"simulation_id": "missing", "output_path": str(tmp_path / "x.parquet")}
+        )
+
+        assert "error" in result
+        assert "not found" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_get_failed_assets(self, clean_state):
+        """Failed asset queries should return assets below the survival threshold."""
+        simulation_id = await _run_failure_simulation()
+
+        result = await get_failed_assets_tool({"simulation_id": simulation_id, "threshold": 0.5})
+
+        assert result["success"] is True
+        assert result["threshold"] == 0.5
+        assert result["failed_asset_count"] == 1
+        assert len(result["failed_assets"]) == 1
+        record = result["failed_assets"][0]
+        assert record["asset_name"] == "Asset 1"
+        assert record["survival_probability"] < 0.5
+        # Timestamp should be JSON-serializable (ISO string)
+        assert "T" in record["timestamp"]
+
+    @pytest.mark.asyncio
+    async def test_get_failed_assets_default_threshold(self, clean_state):
+        """Threshold should default to 0.5 when not provided."""
+        simulation_id = await _run_failure_simulation()
+
+        result = await get_failed_assets_tool({"simulation_id": simulation_id})
+
+        assert result["success"] is True
+        assert result["threshold"] == 0.5
+
+    @pytest.mark.asyncio
+    async def test_get_failed_assets_missing_simulation(self, clean_state):
+        """Failed asset queries with an unknown simulation should return an error."""
+        result = await get_failed_assets_tool({"simulation_id": "missing"})
+
+        assert "error" in result
+        assert "not found" in result["error"].lower()
+
+
+class TestApplyScenarioToSystem:
+    """Test the apply_scenario_to_system tool."""
+
+    @pytest.mark.asyncio
+    async def test_apply_scenario_to_system(self, clean_state, tmp_path, gdm_system):
+        """Applying a scenario to a distribution system should write an updated JSON."""
+        from gdm.distribution.components import DistributionBus
+        from geopy.distance import distance as geodist
+        from infrasys.quantities import Distance
+        from shapely.geometry import Point
+
+        from erad.models.hazard.wind import WindModel
+        from erad.quantities import Pressure, Speed
+        from erad.systems.asset_system import AssetSystem
+        from erad.systems.hazard_system import HazardSystem
+
+        # Persist the original distribution system
+        system_path = tmp_path / "system.json"
+        gdm_system.to_json(system_path)
+
+        # Build an asset system from the GDM model
+        asset_system = AssetSystem.from_gdm(gdm_system)
+        asset_system_id = state.generate_id()
+        state.asset_systems[asset_system_id] = asset_system
+
+        # Build a strong storm offset from the feeder so every asset sees
+        # hurricane-force winds and fails (survival well below the threshold)
+        buses = list(gdm_system.get_components(DistributionBus))
+        cx = sum(b.coordinate.x for b in buses) / len(buses)
+        cy = sum(b.coordinate.y for b in buses) / len(buses)
+        storm_center = geodist(miles=3).destination((cy, cx), bearing=270)
+
+        hazard_system = HazardSystem(auto_add_composed_components=True)
+        hazard_system.add_component(
+            WindModel(
+                name="storm",
+                timestamp=datetime.now(),
+                center=Point(storm_center.longitude, storm_center.latitude),
+                max_wind_speed=Speed(200, "miles/hour"),
+                air_pressure=Pressure(1013.25, "hPa"),
+                radius_of_max_wind=Distance(5, "miles"),
+                radius_of_closest_isobar=Distance(100, "miles"),
+            )
+        )
+        hazard_system_id = state.generate_id()
+        state.hazard_systems[hazard_system_id] = hazard_system
+
+        # Run the simulation and generate scenarios
+        sim_result = await run_simulation_tool(
+            {
+                "asset_system_id": asset_system_id,
+                "hazard_system_id": hazard_system_id,
+            }
+        )
+        assert sim_result["success"] is True, sim_result
+        simulation_id = sim_result["simulation_id"]
+
+        scenarios_result = await generate_scenarios_tool(
+            {"simulation_id": simulation_id, "num_samples": 2, "seed": 42}
+        )
+        assert scenarios_result["success"] is True, scenarios_result
+        scenario_name = next(iter(scenarios_result["scenarios"]))
+
+        # Apply the first scenario to the system
+        output_path = tmp_path / "updated_system.json"
+        result = await apply_scenario_to_system_tool(
+            {
+                "system_path": str(system_path),
+                "simulation_id": simulation_id,
+                "scenario_name": scenario_name,
+                "output_path": str(output_path),
+            }
+        )
+
+        assert result["success"] is True, result
+        assert result["output_path"] == str(output_path)
+        assert result["applied_change_count"] > 0
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
+
+        # The updated system should round-trip and be a valid DistributionSystem
+        from gdm.distribution import DistributionSystem as GDM_DistributionSystem
+
+        updated = GDM_DistributionSystem.from_json(output_path)
+        assert updated is not None
+
+    @pytest.mark.asyncio
+    async def test_apply_scenario_missing_simulation(self, clean_state, tmp_path):
+        """Applying a scenario with an unknown simulation should return an error."""
+        system_path = tmp_path / "system.json"
+        system_path.write_text("{}")
+
+        result = await apply_scenario_to_system_tool(
+            {
+                "system_path": str(system_path),
+                "simulation_id": "missing",
+                "output_path": str(tmp_path / "out.json"),
+            }
+        )
+
+        assert "error" in result
+        assert "not found" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_apply_scenario_unknown_name(self, clean_state, tmp_path, gdm_system):
+        """Applying a nonexistent scenario name should return an error."""
+        from erad.systems.asset_system import AssetSystem
+
+        system_path = tmp_path / "system.json"
+        gdm_system.to_json(system_path)
+
+        asset_system = AssetSystem.from_gdm(gdm_system)
+        asset_system_id = state.generate_id()
+        state.asset_systems[asset_system_id] = asset_system
+
+        from erad.systems.hazard_system import HazardSystem
+
+        hazard_system = HazardSystem.wind_example()
+        hazard_system_id = state.generate_id()
+        state.hazard_systems[hazard_system_id] = hazard_system
+
+        sim_result = await run_simulation_tool(
+            {
+                "asset_system_id": asset_system_id,
+                "hazard_system_id": hazard_system_id,
+            }
+        )
+        assert sim_result["success"] is True, sim_result
+        simulation_id = sim_result["simulation_id"]
+
+        scenarios_result = await generate_scenarios_tool(
+            {"simulation_id": simulation_id, "num_samples": 2, "seed": 42}
+        )
+        assert scenarios_result["success"] is True, scenarios_result
+
+        result = await apply_scenario_to_system_tool(
+            {
+                "system_path": str(system_path),
+                "simulation_id": simulation_id,
+                "scenario_name": "does_not_exist",
+                "output_path": str(tmp_path / "out.json"),
+            }
+        )
+
+        assert "error" in result
 
 
 if __name__ == "__main__":
