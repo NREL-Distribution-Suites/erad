@@ -4,10 +4,39 @@ Export tools for ERAD MCP Server.
 
 import json
 
+from dist_stack import RunstoreError, attach_artifact
 from loguru import logger
 from mcp.server import MCPServer
 
 from .state import state
+
+
+def _get_run_id(simulation_id: str) -> str | None:
+    """Best-effort: the runstore run_id recorded for a simulation, if any."""
+    sim_info = state.simulation_results.get(simulation_id)
+    if sim_info:
+        return sim_info.get("run_id")
+    return None
+
+
+def _get_run_id_for_system(system_id: str, *, system_type: str | None = None) -> str | None:
+    """Best-effort: the runstore run_id recorded for a simulation involving system_id."""
+    for sim_info in state.simulation_results.values():
+        if system_type != "hazard" and sim_info.get("asset_system_id") == system_id:
+            return sim_info.get("run_id")
+        if system_type != "asset" and sim_info.get("hazard_system_id") == system_id:
+            return sim_info.get("run_id")
+    return None
+
+
+def _attach_artifact_best_effort(run_id: str | None, output_path: str) -> None:
+    """Best-effort runstore attach_artifact; never raises."""
+    if not run_id:
+        return
+    try:
+        attach_artifact(run_id, output_path)
+    except RunstoreError as exc:
+        logger.warning(f"runstore attach_artifact skipped for run_id={run_id}: {exc}")
 
 
 async def export_to_sqlite(asset_system_id: str, output_path: str) -> dict:
@@ -28,6 +57,11 @@ async def export_to_sqlite(asset_system_id: str, output_path: str) -> dict:
 
         logger.info(f"Exporting to SQLite: {output_path}")
         asset_system.export_results(output_path)
+
+        # Best-effort: attach the export artifact to the simulation's runstore run.
+        _attach_artifact_best_effort(
+            _get_run_id_for_system(asset_system_id, system_type="asset"), output_path
+        )
 
         return {
             "success": True,
@@ -65,6 +99,11 @@ async def export_to_json(system_id: str, system_type: str, output_path: str) -> 
 
         logger.info(f"Exporting {system_type} system to JSON: {output_path}")
         system.to_json(output_path)
+
+        # Best-effort: attach the export artifact to the simulation's runstore run.
+        _attach_artifact_best_effort(
+            _get_run_id_for_system(system_id, system_type=system_type), output_path
+        )
 
         return {
             "success": True,
@@ -119,6 +158,9 @@ async def export_tracked_changes(simulation_id: str, output_path: str) -> dict:
         with open(output_path, "w") as f:
             json.dump(serialized, f, indent=2)
 
+        # Best-effort: attach the export artifact to the simulation's runstore run.
+        _attach_artifact_best_effort(_get_run_id(simulation_id), output_path)
+
         logger.info(f"Exported {len(tracked_changes)} tracked changes to {output_path}")
 
         return {
@@ -159,6 +201,9 @@ async def export_parquet(simulation_id: str, output_path: str) -> dict:
         logger.info(f"Exporting simulation {simulation_id} to Parquet: {output_path}")
         engine.export_to_parquet(output_path)
 
+        # Best-effort: attach the export artifact to the simulation's runstore run.
+        _attach_artifact_best_effort(_get_run_id(simulation_id), output_path)
+
         return {
             "success": True,
             "output_path": output_path,
@@ -185,6 +230,9 @@ async def export_csv(simulation_id: str, output_path: str) -> dict:
 
         logger.info(f"Exporting simulation {simulation_id} to CSV: {output_path}")
         engine.export_to_csv(output_path)
+
+        # Best-effort: attach the export artifact to the simulation's runstore run.
+        _attach_artifact_best_effort(_get_run_id(simulation_id), output_path)
 
         return {
             "success": True,

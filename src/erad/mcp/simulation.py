@@ -5,8 +5,16 @@ Simulation tools for ERAD MCP Server.
 from datetime import datetime
 from pathlib import Path
 
+from dist_stack import (
+    RunstoreError,
+    attach_artifact,
+    create_run,
+    get_runstore_path,
+    make_run_id,
+    update_run,
+)
 from dist_stack.manifest import write_manifest
-from dist_stack.registry import resolve_model_ref
+from dist_stack.registry import ModelNotFoundError, lookup, resolve_model_ref
 from loguru import logger
 from gdm.distribution import DistributionSystem
 from mcp.server import MCPServer
@@ -24,6 +32,100 @@ from .helpers import get_cache_directory, get_hazard_cache_directory, load_metad
 def _resolve_model_ref_to_path(model_ref: dict) -> Path:
     """Resolve model_ref payload into a local file path."""
     return Path(resolve_model_ref(model_ref))
+
+
+def _resolve_provenance(model_ref: dict | None) -> dict:
+    """Best-effort resolution of registry provenance from a ``model_ref``.
+
+    Returns ``{"model_id", "model_version", "model_hash"}``. Path-only refs
+    (no ``model_id``) stay honest: all three values are None rather than
+    fabricated. A missing registry row is logged and skipped.
+    """
+    provenance = {"model_id": None, "model_version": None, "model_hash": None}
+    if not isinstance(model_ref, dict) or not model_ref.get("model_id"):
+        return provenance
+    try:
+        record = lookup(model_ref["model_id"])
+        provenance["model_id"] = record.model_id
+        provenance["model_version"] = record.version
+        provenance["model_hash"] = record.model_hash
+    except ModelNotFoundError:
+        logger.warning(
+            f"model_id {model_ref['model_id']} not found in registry; "
+            "provenance skipped for loaded system"
+        )
+    return provenance
+
+
+def _record_system_provenance(system_id: str, model_ref: dict | None) -> None:
+    """Record best-effort registry provenance for a loaded system in state."""
+    state.model_provenance[system_id] = _resolve_provenance(model_ref)
+
+
+def _mint_run_id(run_id: str | None) -> str | None:
+    """Best-effort: return a caller-supplied run_id or mint ``sim_<hex12>``.
+
+    Returns None when the runstore is unavailable (``DIST_STACK_RUNSTORE_DB``
+    unset) so callers keep today's behavior exactly.
+    """
+    if run_id:
+        return run_id
+    try:
+        get_runstore_path()  # raises RunstoreUnavailableError when unset
+        return make_run_id("sim")
+    except RunstoreError as exc:
+        logger.warning(f"runstore unavailable; runstore recording skipped: {exc}")
+        return None
+
+
+def _create_run_best_effort(
+    run_id: str,
+    *,
+    asset_system_id: str,
+    hazard_system_id: str,
+    curve_set: str,
+    simulation_id: str,
+    timestamps: list[str],
+) -> None:
+    """Best-effort create_run; never raises. The runstore is the durable mirror."""
+    provenance = state.model_provenance.get(asset_system_id, {})
+    try:
+        create_run(
+            tool="run_simulation",
+            run_type="erad_simulation",
+            run_id=run_id,
+            status="succeeded",
+            model_id=provenance.get("model_id"),
+            model_version=provenance.get("model_version"),
+            model_hash=provenance.get("model_hash"),
+            payload={
+                "asset_system_id": asset_system_id,
+                "hazard_system_id": hazard_system_id,
+                "curve_set": curve_set,
+                "timestamps": timestamps,
+                "simulation_id": simulation_id,
+            },
+        )
+    except RunstoreError as exc:
+        logger.warning(f"runstore create_run skipped for run_id={run_id}: {exc}")
+
+
+def _attach_artifact_best_effort(run_id: str | None, output_path: Path | str) -> None:
+    """Best-effort attach_artifact; never raises."""
+    if not run_id:
+        return
+    try:
+        attach_artifact(run_id, output_path)
+    except RunstoreError as exc:
+        logger.warning(f"runstore attach_artifact skipped for run_id={run_id}: {exc}")
+
+
+def _update_run_best_effort(run_id: str, *, payload: dict) -> None:
+    """Best-effort update_run (payload REPLACES); never raises."""
+    try:
+        update_run(run_id, payload=payload)
+    except RunstoreError as exc:
+        logger.warning(f"runstore update_run skipped for run_id={run_id}: {exc}")
 
 
 async def load_distribution_model(
@@ -73,6 +175,7 @@ async def load_distribution_model(
         # Store in state
         system_id = state.generate_id()
         state.asset_systems[system_id] = asset_system
+        _record_system_provenance(system_id, model_ref)
 
         from erad.models.asset import Asset
 
@@ -122,6 +225,7 @@ async def load_hazard_model(
         # Store in state
         system_id = state.generate_id()
         state.hazard_systems[system_id] = hazard_system
+        _record_system_provenance(system_id, model_ref)
 
         # Count hazard models
         hazard_count = sum(
@@ -405,6 +509,7 @@ async def run_simulation(
     hazard_system_id: str,
     curve_set: str = "DEFAULT_CURVES",
     output_path: str | None = None,
+    run_id: str | None = None,
 ) -> dict:
     """Run a hazard simulation using loaded asset and hazard systems.
 
@@ -413,6 +518,7 @@ async def run_simulation(
         hazard_system_id: ID of loaded hazard system.
         curve_set: Fragility curve set name.
         output_path: Output file path for the simulation artifact (a .manifest.json sidecar is written next to it).
+        run_id: Optional caller-supplied runstore run_id (minted as ``sim_<hex12>`` when omitted).
 
     Returns:
         JSON payload with simulation_id and timestep information on success, or an error payload.
@@ -426,6 +532,10 @@ async def run_simulation(
 
         asset_system = state.asset_systems[asset_system_id]
         hazard_system = state.hazard_systems[hazard_system_id]
+
+        # Best-effort runstore wiring (additive; no-op when DIST_STACK_RUNSTORE_DB
+        # is unset so today's behavior is preserved exactly).
+        run_id = _mint_run_id(run_id)
 
         # Create simulator
         logger.info(
@@ -447,6 +557,8 @@ async def run_simulation(
             "asset_count": len(simulator.assets),
             "timestamps": [ts.isoformat() for ts in simulator.timestamps],
         }
+        if run_id:
+            state.simulation_results[simulation_id]["run_id"] = run_id
 
         # Persist the simulation output artifact and write a provenance manifest
         # sidecar alongside it.
@@ -461,6 +573,7 @@ async def run_simulation(
             for hazard_type in HAZARD_TYPES
             if any(True for _ in hazard_system.get_components(hazard_type))
         ]
+        asset_provenance = state.model_provenance.get(asset_system_id, {})
         write_manifest(
             output_path,
             artifact_type="erad_simulation",
@@ -468,18 +581,32 @@ async def run_simulation(
             tool_version=__version__,
             package="erad",
             package_version=__version__,
+            model_id=asset_provenance.get("model_id"),
+            model_version=asset_provenance.get("model_version"),
+            model_hash=asset_provenance.get("model_hash"),
             config={
                 "hazard_type": ",".join(hazard_types) if hazard_types else "unknown",
                 "scenario_count": 1,
             },
         )
 
+        if run_id:
+            _create_run_best_effort(
+                run_id,
+                asset_system_id=asset_system_id,
+                hazard_system_id=hazard_system_id,
+                curve_set=curve_set,
+                simulation_id=simulation_id,
+                timestamps=[ts.isoformat() for ts in simulator.timestamps],
+            )
+            _attach_artifact_best_effort(run_id, output_path)
+
         logger.info(
             f"Simulation {simulation_id} completed with {len(simulator.timestamps)} timesteps; "
             f"wrote manifest sidecar for {output_path}"
         )
 
-        return {
+        response = {
             "success": True,
             "simulation_id": simulation_id,
             "asset_count": len(simulator.assets),
@@ -487,6 +614,9 @@ async def run_simulation(
             "timestamps": [ts.isoformat() for ts in simulator.timestamps],
             "output_path": str(output_path),
         }
+        if run_id:
+            response["run_id"] = run_id
+        return response
 
     except Exception as e:
         logger.error(f"Error running simulation: {e}")
@@ -528,6 +658,21 @@ async def generate_scenarios(
 
         # Store tracked changes
         state.simulation_results[simulation_id]["tracked_changes"] = tracked_changes
+
+        # Best-effort: record the scenario count on the runstore run row.
+        run_id = sim_info.get("run_id")
+        if run_id:
+            _update_run_best_effort(
+                run_id,
+                payload={
+                    "asset_system_id": sim_info["asset_system_id"],
+                    "hazard_system_id": sim_info["hazard_system_id"],
+                    "curve_set": sim_info["curve_set"],
+                    "timestamps": sim_info["timestamps"],
+                    "simulation_id": simulation_id,
+                    "tracked_changes": len(tracked_changes),
+                },
+            )
 
         # Summarize results
         scenarios = {}

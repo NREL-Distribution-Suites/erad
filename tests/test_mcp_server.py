@@ -63,8 +63,8 @@ class TestServerState:
         id1 = state.generate_id()
         id2 = state.generate_id()
 
-        assert len(id1) == 8
-        assert len(id2) == 8
+        assert len(id1) == 12
+        assert len(id2) == 12
         assert id1 != id2
 
     def test_clear(self):

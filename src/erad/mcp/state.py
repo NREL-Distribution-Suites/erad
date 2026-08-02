@@ -18,10 +18,12 @@ class ServerState:
         self.hazard_systems: dict[str, HazardSystem] = {}
         self.simulation_results: dict[str, dict[str, Any]] = {}
         self.hazard_simulators: dict[str, HazardSimulator] = {}
+        # Registry provenance keyed by system_id: {"model_id", "model_version", "model_hash"}.
+        self.model_provenance: dict[str, dict[str, Any]] = {}
 
     def generate_id(self) -> str:
         """Generate a unique ID."""
-        return str(uuid4())[:8]
+        return uuid4().hex[:12]
 
     def clear(self):
         """Clear all state."""
@@ -29,6 +31,7 @@ class ServerState:
         self.hazard_systems.clear()
         self.simulation_results.clear()
         self.hazard_simulators.clear()
+        self.model_provenance.clear()
 
 
 # Global state instance
