@@ -53,6 +53,7 @@ from .export import (
     export_to_sqlite_tool,
     export_to_json_tool,
     export_tracked_changes_tool,
+    export_to_gdm_tool,
 )
 from .cache import (
     list_cached_models_tool,
@@ -503,6 +504,38 @@ def _get_tools() -> list[Tool]:
                 "required": ["simulation_id", "output_path"],
             },
         ),
+        Tool(
+            name="export_to_gdm",
+            description=(
+                "Apply ERAD simulation tracked changes (e.g. asset outages) back onto the "
+                "original GDM DistributionSystem and write the updated model to JSON. "
+                "The original model must be provided via model_ref or source_path because "
+                "ERAD only caches the AssetSystem, not the raw DistributionSystem."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "simulation_id": {
+                        "type": "string",
+                        "description": "ID of simulation with tracked changes",
+                    },
+                    "output_path": {"type": "string", "description": "Output file path"},
+                    "model_ref": {
+                        "type": "object",
+                        "description": "Model reference ({model_id/version} or direct stored_path/path) for the original GDM distribution model",
+                    },
+                    "source_path": {
+                        "type": "string",
+                        "description": "Path to the original GDM distribution model JSON when model_ref is not provided",
+                    },
+                    "scenario_name": {
+                        "type": "string",
+                        "description": "Optional scenario name to filter tracked changes before applying",
+                    },
+                },
+                "required": ["simulation_id", "output_path"],
+            },
+        ),
         # Cache Management
         Tool(
             name="list_cached_models",
@@ -585,6 +618,7 @@ _TOOL_HANDLERS = {
     "export_to_sqlite": export_to_sqlite_tool,
     "export_to_json": export_to_json_tool,
     "export_tracked_changes": export_tracked_changes_tool,
+    "export_to_gdm": export_to_gdm_tool,
     "list_cached_models": list_cached_models_tool,
     "get_cache_info": get_cache_info_tool,
     "search_documentation": search_documentation_tool,
