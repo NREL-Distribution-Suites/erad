@@ -514,15 +514,24 @@ class AssetSystem(System):
 
         sliders = [dict(active=0, pad={"t": 50}, steps=steps)]
 
-        figure.update_layout(
-            mapbox=dict(
-                style=style.value,
-                zoom=zoom_level,
-                # center=dict(lat=gdf.geometry.y.mean(), lon=gdf.geometry.x.mean()),
-            ),
-            sliders=sliders,
-            showlegend=True if show_legend else False,
-        )
+        if map_type == MapType.SCATTER_MAP:
+            figure.update_layout(
+                map={
+                    "style": style.value,
+                    "zoom": zoom_level,
+                    # "center": {"lat": gdf.geometry.y.mean(), "lon": gdf.geometry.x.mean()},
+                },
+                sliders=sliders,
+                showlegend=True if show_legend else False,
+            )
+        else:
+            figure.update_layout(
+                geo=dict(
+                    projection_scale=zoom_level,
+                ),
+                sliders=sliders,
+                showlegend=True if show_legend else False,
+            )
 
         if show:
             figure.show()
