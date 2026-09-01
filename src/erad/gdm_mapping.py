@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import gdm.distribution.components as gdc
 import gdm.distribution.equipment as gde
 from gdm.distribution.enums import LineType
@@ -5,8 +7,22 @@ from gdm.distribution.enums import LineType
 from erad.enums import AssetTypes
 from erad.models.asset_mapping import ComponentFilterModel
 
-USE_CONSTRUCTION_ATTRIBUTE = False
+# Feature flag: when True, classify distribution MatrixImpedanceBranch components using
+# equipment.construction (LineType) instead of the c_matrix threshold heuristic.
+USE_CONSTRUCTION_ATTRIBUTE: bool = False
 
+
+@contextmanager
+def construction_attribute_enabled(enabled: bool = True):
+    """Temporarily set USE_CONSTRUCTION_ATTRIBUTE within a `with` block."""
+    global USE_CONSTRUCTION_ATTRIBUTE
+    old = USE_CONSTRUCTION_ATTRIBUTE
+    USE_CONSTRUCTION_ATTRIBUTE = enabled
+    try:
+        yield
+    finally:
+        USE_CONSTRUCTION_ATTRIBUTE = old
+
 asset_to_gdm_mapping = {
     AssetTypes.switch: [
         ComponentFilterModel(
