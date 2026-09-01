@@ -1,9 +1,11 @@
 import gdm.distribution.components as gdc
 import gdm.distribution.equipment as gde
+from gdm.distribution.enums import LineType
 
 from erad.enums import AssetTypes
 from erad.models.asset_mapping import ComponentFilterModel
 
+USE_CONSTRUCTION_ATTRIBUTE = False
 
 asset_to_gdm_mapping = {
     AssetTypes.switch: [
@@ -40,10 +42,11 @@ asset_to_gdm_mapping = {
         ),
         ComponentFilterModel(
             component_type=gdc.MatrixImpedanceBranch,
-            component_filter=lambda x: x.equipment.c_matrix[0, 0]
-            .to("microfarad/kilometer")
-            .magnitude
-            > 0.05
+            component_filter=lambda x: (
+                x.equipment.construction == LineType.UNDERGROUND
+                if USE_CONSTRUCTION_ATTRIBUTE
+                else x.equipment.c_matrix[0, 0].to("microfarad/kilometer").magnitude > 0.05
+            )
             and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0,
         ),
     ],
@@ -57,10 +60,11 @@ asset_to_gdm_mapping = {
         ),
         ComponentFilterModel(
             component_type=gdc.MatrixImpedanceBranch,
-            component_filter=lambda x: x.equipment.c_matrix[0, 0]
-            .to("microfarad/kilometer")
-            .magnitude
-            < 0.05
+            component_filter=lambda x: (
+                x.equipment.construction == LineType.OVERHEAD
+                if USE_CONSTRUCTION_ATTRIBUTE
+                else x.equipment.c_matrix[0, 0].to("microfarad/kilometer").magnitude < 0.05
+            )
             and x.buses[0].rated_voltage.to("kilovolt").magnitude < 35.0,
         ),
     ],
