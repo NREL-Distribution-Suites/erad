@@ -40,7 +40,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-    "grid-data-models==2.3.7",
+    "grid-data-models==2.3.8",
     "gdmloader",
     "geopandas",
     "requests",
